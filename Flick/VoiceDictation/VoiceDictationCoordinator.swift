@@ -78,7 +78,7 @@ final class VoiceDictationCoordinator {
             let polished = try await AIService.streamChat(
                 baseURL: settings.apiBaseURL,
                 apiKey: settings.apiKey,
-                model: settings.modelName,
+                model: settings.voicePolishingModel,
                 systemPrompt: Prompt.polish,
                 userContent: transcript,
                 enableReasoning: false

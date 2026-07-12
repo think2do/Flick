@@ -27,8 +27,8 @@ struct SettingsView: View {
         TabView {
             generalTab
                 .tabItem { Label("通用", systemImage: "gear") }
-            promptsTab
-                .tabItem { Label("提示词", systemImage: "text.bubble") }
+            selectionTab
+                .tabItem { Label("划词", systemImage: "text.cursor") }
             voiceTab
                 .tabItem { Label("听写", systemImage: "waveform") }
         }
@@ -71,7 +71,14 @@ struct SettingsView: View {
 
     private var voiceTab: some View {
         Form {
-            Section("语音听写") {
+            Section("模型") {
+                TextField("转写模型", text: $settings.transcriptionModel)
+                    .textFieldStyle(.roundedBorder)
+                TextField("润色模型", text: $settings.voicePolishingModel)
+                    .textFieldStyle(.roundedBorder)
+            }
+
+            Section("快捷键") {
                 HStack {
                     Text("按住说话")
                     Spacer()
@@ -83,14 +90,15 @@ struct SettingsView: View {
                     }
                     .controlSize(.small)
                 }
-                TextField("转写模型", text: $settings.transcriptionModel)
-                    .textFieldStyle(.roundedBorder)
-                Toggle("插入前预览并确认", isOn: $settings.voicePreviewEnabled)
                 if let hotkeyError {
                     Text(hotkeyError)
                         .font(.caption)
                         .foregroundStyle(.red)
                 }
+            }
+
+            Section("输入") {
+                Toggle("插入前预览并确认", isOn: $settings.voicePreviewEnabled)
             }
 
             Section("说明") {
@@ -120,68 +128,6 @@ struct SettingsView: View {
                     }
             }
 
-            Section("模型") {
-                HStack {
-                    Text("当前模型")
-                    Spacer()
-                    Text(settings.modelName.isEmpty ? "未选择" : displayModelName(settings.modelName))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-
-                if !settings.favoriteModels.isEmpty {
-                    List {
-                        ForEach(settings.favoriteModels, id: \.self) { model in
-                            addedModelRow(for: model)
-                        }
-                        .onMove { source, destination in
-                            settings.moveFavoriteModels(fromOffsets: source, toOffset: destination)
-                        }
-                    }
-                    .frame(height: modelListHeight)
-                    .environment(\.defaultMinListRowHeight, 28)
-                } else {
-                    Text("还没有添加模型。")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                if let error = fetchError {
-                    Text(error).font(.caption).foregroundStyle(.red)
-                }
-
-                HStack {
-                    Button(action: openModelLibrary) {
-                        Label("添加模型", systemImage: "plus")
-                    }
-                    .disabled(settings.apiKey.isEmpty || settings.apiBaseURL.isEmpty)
-
-                    if isFetchingModels {
-                        ProgressView()
-                            .controlSize(.small)
-                    }
-                }
-            }
-
-            Section("快捷键") {
-                HStack {
-                    Text("划词处理")
-                    Spacer()
-                    HotkeyRecorderButton(config: settings.selectionHotkeyConfig) { config in
-                        updateHotkey(config, forVoice: false)
-                    }
-                    Button("恢复默认") {
-                        updateHotkey(.selectionDefault, forVoice: false)
-                    }
-                    .controlSize(.small)
-                }
-                if let hotkeyError {
-                    Text(hotkeyError)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                }
-            }
-
         }
         .formStyle(.grouped)
     }
@@ -200,12 +146,78 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Prompts Tab
+    // MARK: - Selection Tab
 
     @State private var draggingPrompt: CustomPrompt?
 
-    private var promptsTab: some View {
+    private var selectionTab: some View {
         VStack(spacing: 0) {
+            Form {
+                Section("划词模型") {
+                    HStack {
+                        Text("当前模型")
+                        Spacer()
+                        Text(settings.modelName.isEmpty ? "未选择" : displayModelName(settings.modelName))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+
+                    if !settings.favoriteModels.isEmpty {
+                        List {
+                            ForEach(settings.favoriteModels, id: \.self) { model in
+                                addedModelRow(for: model)
+                            }
+                            .onMove { source, destination in
+                                settings.moveFavoriteModels(fromOffsets: source, toOffset: destination)
+                            }
+                        }
+                        .frame(height: min(modelListHeight, 96))
+                        .environment(\.defaultMinListRowHeight, 28)
+                    } else {
+                        Text("还没有添加模型。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    HStack {
+                        Button(action: openModelLibrary) {
+                            Label("添加模型", systemImage: "plus")
+                        }
+                        .disabled(settings.apiKey.isEmpty || settings.apiBaseURL.isEmpty)
+                        if isFetchingModels { ProgressView().controlSize(.small) }
+                    }
+                    if let error = fetchError {
+                        Text(error).font(.caption).foregroundStyle(.red)
+                    }
+                }
+
+                Section("快捷键") {
+                    HStack {
+                        Text("划词处理")
+                        Spacer()
+                        HotkeyRecorderButton(config: settings.selectionHotkeyConfig) { config in
+                            updateHotkey(config, forVoice: false)
+                        }
+                        Button("恢复默认") {
+                            updateHotkey(.selectionDefault, forVoice: false)
+                        }
+                        .controlSize(.small)
+                    }
+                    if let hotkeyError {
+                        Text(hotkeyError).font(.caption).foregroundStyle(.red)
+                    }
+                }
+            }
+            .formStyle(.grouped)
+            .frame(height: 245)
+
+            HStack {
+                Text("提示词").font(.headline)
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+
             List {
                 ForEach(settings.customPrompts) { prompt in
                     HStack(spacing: 10) {

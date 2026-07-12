@@ -59,6 +59,7 @@ class SettingsManager: ObservableObject {
         static let enableReasoning = "enableReasoning"
         static let favoriteModels = "favoriteModels"
         static let transcriptionModel = "transcriptionModel"
+        static let voicePolishingModel = "voicePolishingModel"
         static let voicePreviewEnabled = "voicePreviewEnabled"
     }
 
@@ -112,6 +113,10 @@ class SettingsManager: ObservableObject {
         didSet { UserDefaults.standard.set(transcriptionModel, forKey: Keys.transcriptionModel) }
     }
 
+    @Published var voicePolishingModel: String {
+        didSet { UserDefaults.standard.set(voicePolishingModel, forKey: Keys.voicePolishingModel) }
+    }
+
     @Published var voicePreviewEnabled: Bool {
         didSet { UserDefaults.standard.set(voicePreviewEnabled, forKey: Keys.voicePreviewEnabled) }
     }
@@ -124,6 +129,9 @@ class SettingsManager: ObservableObject {
         self.favoriteModels = UserDefaults.standard.stringArray(forKey: Keys.favoriteModels) ?? []
         self.transcriptionModel = UserDefaults.standard.string(forKey: Keys.transcriptionModel)
             ?? "openai/whisper-large-v3"
+        self.voicePolishingModel = UserDefaults.standard.string(forKey: Keys.voicePolishingModel)
+            ?? UserDefaults.standard.string(forKey: Keys.modelName)
+            ?? "gpt-4o"
         self.voicePreviewEnabled = UserDefaults.standard.bool(forKey: Keys.voicePreviewEnabled)
 
         if let data = UserDefaults.standard.data(forKey: Keys.customPrompts),
