@@ -5,6 +5,7 @@
 
 import AppKit
 import Carbon
+import Combine
 import SwiftUI
 
 @MainActor
@@ -14,12 +15,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let floatingPanel = FloatingPanelController()
     private let voiceDictation = VoiceDictationCoordinator()
     private var settingsWindow: NSWindow?
+    private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
 
         setupStatusBar()
         setupHotkey()
+        observeHotkeyChanges()
         checkAccessibilityPermission()
     }
 
@@ -37,20 +40,31 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func setupHotkey() {
+        hotkeyManager?.stop()
+        let settings = SettingsManager.shared
         let manager = GlobalHotkeyManager()
         manager.register(
-            keyCode: UInt32(kVK_ANSI_E),
-            modifiers: UInt32(cmdKey),
+            keyCode: settings.selectionHotkeyConfig.keyCode,
+            modifiers: settings.selectionHotkeyConfig.modifiers,
             onPressed: { [weak self] in self?.handleHotkeyTriggered() }
         )
         manager.register(
-            keyCode: UInt32(kVK_ANSI_D),
-            modifiers: UInt32(cmdKey | shiftKey),
+            keyCode: settings.voiceHotkeyConfig.keyCode,
+            modifiers: settings.voiceHotkeyConfig.modifiers,
             onPressed: { [weak self] in self?.voiceDictation.startRecording() },
             onReleased: { [weak self] in self?.voiceDictation.stopRecording() }
         )
         hotkeyManager = manager
         hotkeyManager?.start()
+    }
+
+    private func observeHotkeyChanges() {
+        SettingsManager.shared.$selectionHotkeyConfig
+            .combineLatest(SettingsManager.shared.$voiceHotkeyConfig)
+            .dropFirst()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _, _ in self?.setupHotkey() }
+            .store(in: &cancellables)
     }
 
     private func handleHotkeyTriggered() {

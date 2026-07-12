@@ -34,7 +34,16 @@ struct HotkeyConfig: Codable, Equatable {
     var modifiers: UInt32
     var displayName: String
 
-    static let `default` = HotkeyConfig(keyCode: UInt32(kVK_Space), modifiers: UInt32(optionKey), displayName: "⌥Space")
+    static let selectionDefault = HotkeyConfig(
+        keyCode: UInt32(kVK_ANSI_E),
+        modifiers: UInt32(cmdKey),
+        displayName: "⌘E"
+    )
+    static let voiceDefault = HotkeyConfig(
+        keyCode: UInt32(kVK_ANSI_D),
+        modifiers: UInt32(cmdKey | shiftKey),
+        displayName: "⌘⇧D"
+    )
 }
 
 class SettingsManager: ObservableObject {
@@ -45,7 +54,8 @@ class SettingsManager: ObservableObject {
         static let modelName = "modelName"
         static let apiKey = "apiKey"
         static let customPrompts = "customPrompts"
-        static let hotkeyConfig = "hotkeyConfig"
+        static let selectionHotkeyConfig = "selectionHotkeyConfig"
+        static let voiceHotkeyConfig = "voiceHotkeyConfig"
         static let enableReasoning = "enableReasoning"
         static let favoriteModels = "favoriteModels"
         static let transcriptionModel = "transcriptionModel"
@@ -82,10 +92,18 @@ class SettingsManager: ObservableObject {
         }
     }
 
-    @Published var hotkeyConfig: HotkeyConfig {
+    @Published var selectionHotkeyConfig: HotkeyConfig {
         didSet {
-            if let data = try? JSONEncoder().encode(hotkeyConfig) {
-                UserDefaults.standard.set(data, forKey: Keys.hotkeyConfig)
+            if let data = try? JSONEncoder().encode(selectionHotkeyConfig) {
+                UserDefaults.standard.set(data, forKey: Keys.selectionHotkeyConfig)
+            }
+        }
+    }
+
+    @Published var voiceHotkeyConfig: HotkeyConfig {
+        didSet {
+            if let data = try? JSONEncoder().encode(voiceHotkeyConfig) {
+                UserDefaults.standard.set(data, forKey: Keys.voiceHotkeyConfig)
             }
         }
     }
@@ -115,11 +133,18 @@ class SettingsManager: ObservableObject {
             self.customPrompts = CustomPrompt.defaults
         }
 
-        if let data = UserDefaults.standard.data(forKey: Keys.hotkeyConfig),
+        if let data = UserDefaults.standard.data(forKey: Keys.selectionHotkeyConfig),
            let config = try? JSONDecoder().decode(HotkeyConfig.self, from: data) {
-            self.hotkeyConfig = config
+            self.selectionHotkeyConfig = config
         } else {
-            self.hotkeyConfig = HotkeyConfig.default
+            self.selectionHotkeyConfig = HotkeyConfig.selectionDefault
+        }
+
+        if let data = UserDefaults.standard.data(forKey: Keys.voiceHotkeyConfig),
+           let config = try? JSONDecoder().decode(HotkeyConfig.self, from: data) {
+            self.voiceHotkeyConfig = config
+        } else {
+            self.voiceHotkeyConfig = HotkeyConfig.voiceDefault
         }
     }
 

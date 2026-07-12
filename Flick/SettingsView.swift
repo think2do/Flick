@@ -3,6 +3,8 @@
 //  Flick
 //
 
+import AppKit
+import Carbon
 import SwiftUI
 
 struct SettingsView: View {
@@ -14,6 +16,7 @@ struct SettingsView: View {
     @State private var isModelLibraryPresented = false
     @State private var fetchModelsTask: Task<Void, Never>?
     @State private var fetchGeneration = 0
+    @State private var hotkeyError: String?
     private var modelListHeight: CGFloat {
         let rowHeight: CGFloat = 28
         let padding: CGFloat = 8
@@ -72,15 +75,22 @@ struct SettingsView: View {
                 HStack {
                     Text("按住说话")
                     Spacer()
-                    Text("⌘⇧D")
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.secondary.opacity(0.1))
-                        .cornerRadius(6)
+                    HotkeyRecorderButton(config: settings.voiceHotkeyConfig) { config in
+                        updateHotkey(config, forVoice: true)
+                    }
+                    Button("恢复默认") {
+                        updateHotkey(.voiceDefault, forVoice: true)
+                    }
+                    .controlSize(.small)
                 }
                 TextField("转写模型", text: $settings.transcriptionModel)
                     .textFieldStyle(.roundedBorder)
                 Toggle("插入前预览并确认", isOn: $settings.voicePreviewEnabled)
+                if let hotkeyError {
+                    Text(hotkeyError)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
             }
 
             Section("说明") {
@@ -155,19 +165,39 @@ struct SettingsView: View {
 
             Section("快捷键") {
                 HStack {
-                    Text("全局快捷键：")
+                    Text("划词处理")
                     Spacer()
-                    Text("⌘E")
-                        .frame(minWidth: 100)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.secondary.opacity(0.1))
-                        .cornerRadius(6)
+                    HotkeyRecorderButton(config: settings.selectionHotkeyConfig) { config in
+                        updateHotkey(config, forVoice: false)
+                    }
+                    Button("恢复默认") {
+                        updateHotkey(.selectionDefault, forVoice: false)
+                    }
+                    .controlSize(.small)
+                }
+                if let hotkeyError {
+                    Text(hotkeyError)
+                        .font(.caption)
+                        .foregroundStyle(.red)
                 }
             }
 
         }
         .formStyle(.grouped)
+    }
+
+    private func updateHotkey(_ config: HotkeyConfig, forVoice: Bool) {
+        let other = forVoice ? settings.selectionHotkeyConfig : settings.voiceHotkeyConfig
+        guard config.keyCode != other.keyCode || config.modifiers != other.modifiers else {
+            hotkeyError = "两个功能不能使用相同的快捷键。"
+            return
+        }
+        hotkeyError = nil
+        if forVoice {
+            settings.voiceHotkeyConfig = config
+        } else {
+            settings.selectionHotkeyConfig = config
+        }
     }
 
     // MARK: - Prompts Tab
@@ -325,6 +355,109 @@ struct SettingsView: View {
         .contentShape(Rectangle())
         .onTapGesture {
             settings.modelName = model
+        }
+    }
+}
+
+private struct HotkeyRecorderButton: View {
+    let config: HotkeyConfig
+    let onRecord: (HotkeyConfig) -> Void
+
+    @State private var isRecording = false
+    @State private var monitor: Any?
+
+    var body: some View {
+        Button(isRecording ? "请按组合键…" : config.displayName) {
+            beginRecording()
+        }
+        .frame(minWidth: 96)
+        .onDisappear { stopRecording() }
+    }
+
+    private func beginRecording() {
+        stopRecording()
+        isRecording = true
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            if event.keyCode == UInt16(kVK_Escape) {
+                DispatchQueue.main.async { stopRecording() }
+                return nil
+            }
+
+            let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            let modifiers = carbonModifiers(from: flags)
+            guard modifiers != 0, let key = keyLabel(for: event) else { return nil }
+            let displayName = modifierLabel(from: flags) + key
+            let newConfig = HotkeyConfig(
+                keyCode: UInt32(event.keyCode),
+                modifiers: modifiers,
+                displayName: displayName
+            )
+            DispatchQueue.main.async {
+                onRecord(newConfig)
+                stopRecording()
+            }
+            return nil
+        }
+    }
+
+    private func stopRecording() {
+        if let monitor {
+            NSEvent.removeMonitor(monitor)
+            self.monitor = nil
+        }
+        isRecording = false
+    }
+
+    private func carbonModifiers(from flags: NSEvent.ModifierFlags) -> UInt32 {
+        var result: UInt32 = 0
+        if flags.contains(.command) { result |= UInt32(cmdKey) }
+        if flags.contains(.option) { result |= UInt32(optionKey) }
+        if flags.contains(.control) { result |= UInt32(controlKey) }
+        if flags.contains(.shift) { result |= UInt32(shiftKey) }
+        return result
+    }
+
+    private func modifierLabel(from flags: NSEvent.ModifierFlags) -> String {
+        var result = ""
+        if flags.contains(.command) { result += "⌘" }
+        if flags.contains(.option) { result += "⌥" }
+        if flags.contains(.control) { result += "⌃" }
+        if flags.contains(.shift) { result += "⇧" }
+        return result
+    }
+
+    private func keyLabel(for event: NSEvent) -> String? {
+        switch Int(event.keyCode) {
+        case kVK_Space: return "Space"
+        case kVK_Return: return "↩"
+        case kVK_Tab: return "⇥"
+        case kVK_Delete: return "⌫"
+        case kVK_ForwardDelete: return "⌦"
+        case kVK_LeftArrow: return "←"
+        case kVK_RightArrow: return "→"
+        case kVK_UpArrow: return "↑"
+        case kVK_DownArrow: return "↓"
+        case kVK_Home: return "Home"
+        case kVK_End: return "End"
+        case kVK_PageUp: return "Page Up"
+        case kVK_PageDown: return "Page Down"
+        case kVK_F1: return "F1"
+        case kVK_F2: return "F2"
+        case kVK_F3: return "F3"
+        case kVK_F4: return "F4"
+        case kVK_F5: return "F5"
+        case kVK_F6: return "F6"
+        case kVK_F7: return "F7"
+        case kVK_F8: return "F8"
+        case kVK_F9: return "F9"
+        case kVK_F10: return "F10"
+        case kVK_F11: return "F11"
+        case kVK_F12: return "F12"
+        default:
+            guard let characters = event.charactersIgnoringModifiers,
+                  !characters.isEmpty
+            else { return nil }
+            return characters.uppercased()
         }
     }
 }
