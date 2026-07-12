@@ -15,10 +15,6 @@ struct PresetPromptView: View {
     @State private var activePrompt: CustomPrompt?
     @State private var customInput: String = ""
     @State private var isCustomMode = false
-    @State private var balanceText: String = "余额读取中..."
-    @State private var balanceTask: Task<Void, Never>?
-    @State private var lastBalanceRefreshAt: Date?
-    @State private var shouldRefreshBalanceAfterResponse = false
     private var prompts: [CustomPrompt] { settings.customPrompts }
     private var favoriteModels: [String] {
         settings.favoriteModels.filter { !$0.isEmpty }
@@ -33,11 +29,6 @@ struct PresetPromptView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
-                Text(balanceText)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-
                 Spacer(minLength: 8)
 
                 modelSwitcher
@@ -70,12 +61,6 @@ struct PresetPromptView: View {
             RoundedRectangle(cornerRadius: 10)
                 .stroke(.quaternary, lineWidth: 0.5)
         )
-        .onAppear {
-            loadBalance(force: true)
-        }
-        .onDisappear {
-            balanceTask?.cancel()
-        }
     }
 
     // MARK: - Compact Prompt List
@@ -89,7 +74,6 @@ struct PresetPromptView: View {
         } else {
             aiService.sendRequest(systemPrompt: promptText, userContent: selectedText)
         }
-        shouldRefreshBalanceAfterResponse = true
         onResize(NSSize(width: 380, height: 360))
     }
 
@@ -149,7 +133,6 @@ struct PresetPromptView: View {
         isCustomMode = true
         let userMessage = customInput + "\n\n" + selectedText
         aiService.sendRequest(systemPrompt: "", userContent: userMessage)
-        shouldRefreshBalanceAfterResponse = true
         onResize(NSSize(width: 380, height: 360))
     }
 
@@ -171,47 +154,6 @@ struct PresetPromptView: View {
         if let monitor = keyMonitor {
             NSEvent.removeMonitor(monitor)
             keyMonitor = nil
-        }
-    }
-
-    private func loadBalance(force: Bool = false) {
-        let settings = SettingsManager.shared
-        guard !settings.apiKey.isEmpty else {
-            balanceText = "余额: 未配置 Key"
-            return
-        }
-
-        guard settings.apiBaseURL.localizedCaseInsensitiveContains("openrouter.ai") else {
-            balanceText = "余额: 非 OpenRouter"
-            return
-        }
-
-        if !force,
-           let lastBalanceRefreshAt,
-           Date().timeIntervalSince(lastBalanceRefreshAt) < 2 {
-            return
-        }
-
-        let baseURL = settings.apiBaseURL
-        let apiKey = settings.apiKey
-        balanceTask?.cancel()
-
-        balanceTask = Task {
-            do {
-                let balance = try await AIService.fetchBalance(baseURL: baseURL, apiKey: apiKey)
-                guard !Task.isCancelled else { return }
-                let formattedBalance = String(format: "%.2f", balance)
-                await MainActor.run {
-                    lastBalanceRefreshAt = Date()
-                    balanceText = "余额: $\(formattedBalance)"
-                }
-            } catch {
-                guard !Task.isCancelled else { return }
-                await MainActor.run {
-                    lastBalanceRefreshAt = Date()
-                    balanceText = "余额读取失败"
-                }
-            }
         }
     }
 
@@ -293,11 +235,6 @@ struct PresetPromptView: View {
                 }
                 .onChange(of: aiService.responseText) {
                     withAnimation { proxy.scrollTo("bottom") }
-                }
-                .onChange(of: aiService.isLoading) {
-                    guard !aiService.isLoading, shouldRefreshBalanceAfterResponse else { return }
-                    shouldRefreshBalanceAfterResponse = false
-                    loadBalance(force: true)
                 }
             }
 

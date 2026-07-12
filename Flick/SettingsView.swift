@@ -17,6 +17,9 @@ struct SettingsView: View {
     @State private var fetchModelsTask: Task<Void, Never>?
     @State private var fetchGeneration = 0
     @State private var hotkeyError: String?
+    @State private var balanceText = "未读取"
+    @State private var isFetchingBalance = false
+    @State private var balanceTask: Task<Void, Never>?
 
     var body: some View {
         TabView {
@@ -30,6 +33,10 @@ struct SettingsView: View {
         .frame(width: 520, height: 460)
         .onDisappear {
             fetchModelsTask?.cancel()
+            balanceTask?.cancel()
+        }
+        .onAppear {
+            scheduleBalanceLoad(immediately: true)
         }
         .sheet(item: $editingPrompt) { prompt in
             PromptEditorSheet(
@@ -114,13 +121,37 @@ struct SettingsView: View {
                     .textFieldStyle(.roundedBorder)
                     .onChange(of: settings.apiKey) {
                         invalidateModelLibrary()
+                        scheduleBalanceLoad()
                     }
 
                 TextField("API 基础地址", text: $settings.apiBaseURL)
                     .textFieldStyle(.roundedBorder)
                     .onChange(of: settings.apiBaseURL) {
                         invalidateModelLibrary()
+                        scheduleBalanceLoad()
                     }
+            }
+
+            Section("账户余额") {
+                HStack {
+                    Text("OpenRouter")
+                    Spacer()
+                    if isFetchingBalance {
+                        ProgressView().controlSize(.small)
+                    }
+                    Text(balanceText)
+                        .foregroundStyle(.secondary)
+                }
+                HStack {
+                    Spacer()
+                    Button("刷新") {
+                        scheduleBalanceLoad(immediately: true)
+                    }
+                    .disabled(
+                        isFetchingBalance || settings.apiKey.isEmpty ||
+                        !settings.apiBaseURL.localizedCaseInsensitiveContains("openrouter.ai")
+                    )
+                }
             }
 
         }
@@ -308,6 +339,44 @@ struct SettingsView: View {
         fetchError = nil
         fetchModelsTask?.cancel()
         isFetchingModels = false
+    }
+
+    private func scheduleBalanceLoad(immediately: Bool = false) {
+        balanceTask?.cancel()
+        guard !settings.apiKey.isEmpty else {
+            balanceText = "未配置 API Key"
+            isFetchingBalance = false
+            return
+        }
+        guard settings.apiBaseURL.localizedCaseInsensitiveContains("openrouter.ai") else {
+            balanceText = "当前渠道不支持查询"
+            isFetchingBalance = false
+            return
+        }
+
+        let baseURL = settings.apiBaseURL
+        let apiKey = settings.apiKey
+        isFetchingBalance = true
+        balanceTask = Task {
+            do {
+                if !immediately {
+                    try await Task.sleep(for: .milliseconds(500))
+                }
+                let balance = try await AIService.fetchBalance(baseURL: baseURL, apiKey: apiKey)
+                try Task.checkCancellation()
+                await MainActor.run {
+                    balanceText = String(format: "$%.2f", balance)
+                    isFetchingBalance = false
+                }
+            } catch is CancellationError {
+                return
+            } catch {
+                await MainActor.run {
+                    balanceText = "读取失败"
+                    isFetchingBalance = false
+                }
+            }
+        }
     }
 
     private func displayModelName(_ model: String) -> String {
