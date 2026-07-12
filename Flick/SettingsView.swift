@@ -17,11 +17,6 @@ struct SettingsView: View {
     @State private var fetchModelsTask: Task<Void, Never>?
     @State private var fetchGeneration = 0
     @State private var hotkeyError: String?
-    private var modelListHeight: CGFloat {
-        let rowHeight: CGFloat = 28
-        let padding: CGFloat = 8
-        return min(CGFloat(settings.favoriteModels.count) * rowHeight + padding, 180)
-    }
 
     var body: some View {
         TabView {
@@ -148,77 +143,60 @@ struct SettingsView: View {
 
     // MARK: - Selection Tab
 
-    @State private var draggingPrompt: CustomPrompt?
-
     private var selectionTab: some View {
-        VStack(spacing: 0) {
-            Form {
-                Section("划词模型") {
-                    HStack {
-                        Text("当前模型")
-                        Spacer()
-                        Text(settings.modelName.isEmpty ? "未选择" : displayModelName(settings.modelName))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
+        Form {
+            Section("划词模型") {
+                HStack {
+                    Text("当前模型")
+                    Spacer()
+                    Text(settings.modelName.isEmpty ? "未选择" : displayModelName(settings.modelName))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
 
-                    if !settings.favoriteModels.isEmpty {
-                        List {
-                            ForEach(settings.favoriteModels, id: \.self) { model in
-                                addedModelRow(for: model)
-                            }
-                            .onMove { source, destination in
-                                settings.moveFavoriteModels(fromOffsets: source, toOffset: destination)
-                            }
-                        }
-                        .frame(height: min(modelListHeight, 96))
-                        .environment(\.defaultMinListRowHeight, 28)
-                    } else {
-                        Text("还没有添加模型。")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                if settings.favoriteModels.isEmpty {
+                    Text("还没有添加模型。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(settings.favoriteModels, id: \.self) { model in
+                        addedModelRow(for: model)
                     }
-
-                    HStack {
-                        Button(action: openModelLibrary) {
-                            Label("添加模型", systemImage: "plus")
-                        }
-                        .disabled(settings.apiKey.isEmpty || settings.apiBaseURL.isEmpty)
-                        if isFetchingModels { ProgressView().controlSize(.small) }
-                    }
-                    if let error = fetchError {
-                        Text(error).font(.caption).foregroundStyle(.red)
+                    .onMove { source, destination in
+                        settings.moveFavoriteModels(fromOffsets: source, toOffset: destination)
                     }
                 }
 
-                Section("快捷键") {
-                    HStack {
-                        Text("划词处理")
-                        Spacer()
-                        HotkeyRecorderButton(config: settings.selectionHotkeyConfig) { config in
-                            updateHotkey(config, forVoice: false)
-                        }
-                        Button("恢复默认") {
-                            updateHotkey(.selectionDefault, forVoice: false)
-                        }
-                        .controlSize(.small)
+                HStack {
+                    Button(action: openModelLibrary) {
+                        Label("添加模型", systemImage: "plus")
                     }
-                    if let hotkeyError {
-                        Text(hotkeyError).font(.caption).foregroundStyle(.red)
-                    }
+                    .disabled(settings.apiKey.isEmpty || settings.apiBaseURL.isEmpty)
+                    if isFetchingModels { ProgressView().controlSize(.small) }
+                }
+                if let error = fetchError {
+                    Text(error).font(.caption).foregroundStyle(.red)
                 }
             }
-            .formStyle(.grouped)
-            .frame(height: 245)
 
-            HStack {
-                Text("提示词").font(.headline)
-                Spacer()
+            Section("快捷键") {
+                HStack {
+                    Text("划词处理")
+                    Spacer()
+                    HotkeyRecorderButton(config: settings.selectionHotkeyConfig) { config in
+                        updateHotkey(config, forVoice: false)
+                    }
+                    Button("恢复默认") {
+                        updateHotkey(.selectionDefault, forVoice: false)
+                    }
+                    .controlSize(.small)
+                }
+                if let hotkeyError {
+                    Text(hotkeyError).font(.caption).foregroundStyle(.red)
+                }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
 
-            List {
+            Section("提示词") {
                 ForEach(settings.customPrompts) { prompt in
                     HStack(spacing: 10) {
                         Image(systemName: "line.3.horizontal")
@@ -257,26 +235,24 @@ struct SettingsView: View {
                 .onMove { source, destination in
                     settings.customPrompts.move(fromOffsets: source, toOffset: destination)
                 }
-            }
 
-            Divider()
+                HStack {
+                    Button(action: {
+                        editingPrompt = CustomPrompt(icon: "star", title: "", systemPrompt: "{{text}}")
+                    }) {
+                        Label("添加提示词", systemImage: "plus")
+                    }
 
-            HStack {
-                Button(action: {
-                    editingPrompt = CustomPrompt(icon: "star", title: "", systemPrompt: "{{text}}")
-                }) {
-                    Label("添加提示词", systemImage: "plus")
+                    Spacer()
+
+                    Button("恢复默认") {
+                        settings.customPrompts = CustomPrompt.defaults
+                    }
+                    .foregroundStyle(.secondary)
                 }
-
-                Spacer()
-
-                Button("恢复默认") {
-                    settings.customPrompts = CustomPrompt.defaults
-                }
-                .foregroundStyle(.secondary)
             }
-            .padding(12)
         }
+        .formStyle(.grouped)
     }
 
     // MARK: - Actions
