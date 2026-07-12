@@ -19,7 +19,6 @@ build/
 .swiftpm
 .build/
 Packages/
-*.xcodeproj
 
 # App Code Signing
 *.p12
