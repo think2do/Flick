@@ -40,14 +40,30 @@ class AIService: ObservableObject {
 
         currentTask = Task { [weak self] in
             do {
-                try await self?.streamChat(
+                _ = try await Self.streamChat(
                     baseURL: settings.apiBaseURL,
                     apiKey: settings.apiKey,
                     model: settings.modelName,
                     systemPrompt: systemPrompt,
                     userContent: userContent,
-                    enableReasoning: settings.enableReasoning
+                    enableReasoning: settings.enableReasoning,
+                    onReasoningDelta: { [weak self] reasoning in
+                        await MainActor.run {
+                            self?.isReasoning = true
+                            self?.reasoningText += reasoning
+                        }
+                    },
+                    onContentDelta: { [weak self] content in
+                        await MainActor.run {
+                            self?.isReasoning = false
+                            self?.responseText += content
+                        }
+                    }
                 )
+                await MainActor.run {
+                    self?.isReasoning = false
+                    self?.isLoading = false
+                }
             } catch is CancellationError {
                 // cancelled
             } catch {
@@ -69,25 +85,40 @@ class AIService: ObservableObject {
     }
 
     /// A URLSession that bypasses system proxy to avoid auth header stripping
-    private static let directSession: URLSession = {
+    static let directSession: URLSession = {
         let config = URLSessionConfiguration.default
         config.connectionProxyDictionary = [:]
         return URLSession(configuration: config)
     }()
 
-    private func streamChat(
+    static func makeAuthorizedRequest(
+        url: URL,
+        apiKey: String,
+        contentType: String? = "application/json"
+    ) -> URLRequest {
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        if let contentType {
+            request.setValue(contentType, forHTTPHeaderField: "Content-Type")
+        }
+        return request
+    }
+
+    /// Streams a chat completion independently from any view state and returns
+    /// the complete content accumulated from the stream.
+    static func streamChat(
         baseURL: String,
         apiKey: String,
         model: String,
         systemPrompt: String,
         userContent: String,
-        enableReasoning: Bool
-    ) async throws {
+        enableReasoning: Bool,
+        onReasoningDelta: ((String) async -> Void)? = nil,
+        onContentDelta: ((String) async -> Void)? = nil
+    ) async throws -> String {
         let url = URL(string: "\(Self.normalizedBaseURL(baseURL))/chat/completions")!
-        var request = URLRequest(url: url)
+        var request = makeAuthorizedRequest(url: url, apiKey: apiKey)
         request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         print("[Flick] Chat request: reasoning=\(enableReasoning), model=\(model)")
 
         var messages: [[String: String]] = []
@@ -126,7 +157,7 @@ class AIService: ObservableObject {
         }
 
         // Track if we've seen any reasoning tokens
-        var hasReceivedReasoning = false
+        var result = ""
 
         for try await line in bytes.lines {
             try Task.checkCancellation()
@@ -143,35 +174,16 @@ class AIService: ObservableObject {
 
             // Handle reasoning tokens (from delta.reasoning field)
             if let reasoning = delta["reasoning"] as? String, !reasoning.isEmpty {
-                if !hasReceivedReasoning {
-                    hasReceivedReasoning = true
-                    await MainActor.run { [weak self] in
-                        self?.isReasoning = true
-                    }
-                }
-                await MainActor.run { [weak self] in
-                    self?.reasoningText += reasoning
-                }
+                await onReasoningDelta?(reasoning)
             }
 
             // Handle content tokens
             if let content = delta["content"] as? String, !content.isEmpty {
-                // If we were reasoning and now getting content, reasoning is done
-                if hasReceivedReasoning {
-                    await MainActor.run { [weak self] in
-                        self?.isReasoning = false
-                    }
-                }
-                await MainActor.run { [weak self] in
-                    self?.responseText += content
-                }
+                result += content
+                await onContentDelta?(content)
             }
         }
-
-        await MainActor.run { [weak self] in
-            self?.isReasoning = false
-            self?.isLoading = false
-        }
+        return result
     }
 
     // Fetch available models from API
