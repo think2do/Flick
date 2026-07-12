@@ -48,6 +48,8 @@ class SettingsManager: ObservableObject {
         static let hotkeyConfig = "hotkeyConfig"
         static let enableReasoning = "enableReasoning"
         static let favoriteModels = "favoriteModels"
+        static let transcriptionModel = "transcriptionModel"
+        static let voicePreviewEnabled = "voicePreviewEnabled"
     }
 
     @Published var apiBaseURL: String {
@@ -88,12 +90,23 @@ class SettingsManager: ObservableObject {
         }
     }
 
+    @Published var transcriptionModel: String {
+        didSet { UserDefaults.standard.set(transcriptionModel, forKey: Keys.transcriptionModel) }
+    }
+
+    @Published var voicePreviewEnabled: Bool {
+        didSet { UserDefaults.standard.set(voicePreviewEnabled, forKey: Keys.voicePreviewEnabled) }
+    }
+
     private init() {
         self.apiBaseURL = UserDefaults.standard.string(forKey: Keys.apiBaseURL) ?? "https://api.openai.com/v1"
         self.modelName = UserDefaults.standard.string(forKey: Keys.modelName) ?? "gpt-4o"
         self.apiKey = KeychainHelper.read(key: Keys.apiKey) ?? ""
         self.enableReasoning = UserDefaults.standard.bool(forKey: Keys.enableReasoning)
         self.favoriteModels = UserDefaults.standard.stringArray(forKey: Keys.favoriteModels) ?? []
+        self.transcriptionModel = UserDefaults.standard.string(forKey: Keys.transcriptionModel)
+            ?? "openai/whisper-large-v3"
+        self.voicePreviewEnabled = UserDefaults.standard.bool(forKey: Keys.voicePreviewEnabled)
 
         if let data = UserDefaults.standard.data(forKey: Keys.customPrompts),
            let prompts = try? JSONDecoder().decode([CustomPrompt].self, from: data) {

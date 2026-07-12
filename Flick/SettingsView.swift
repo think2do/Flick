@@ -26,6 +26,8 @@ struct SettingsView: View {
                 .tabItem { Label("通用", systemImage: "gear") }
             promptsTab
                 .tabItem { Label("提示词", systemImage: "text.bubble") }
+            voiceTab
+                .tabItem { Label("听写", systemImage: "waveform") }
         }
         .frame(width: 520, height: 460)
         .onDisappear {
@@ -62,6 +64,32 @@ struct SettingsView: View {
                 }
             )
         }
+    }
+
+    private var voiceTab: some View {
+        Form {
+            Section("语音听写") {
+                HStack {
+                    Text("按住说话")
+                    Spacer()
+                    Text("⌘⇧D")
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.secondary.opacity(0.1))
+                        .cornerRadius(6)
+                }
+                TextField("转写模型", text: $settings.transcriptionModel)
+                    .textFieldStyle(.roundedBorder)
+                Toggle("插入前预览并确认", isOn: $settings.voicePreviewEnabled)
+            }
+
+            Section("说明") {
+                Text("听写使用上方通用设置中的 API Key 和基础地址。松开快捷键后，Flick 会转写、整理并把文字输入到原来的光标位置。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
     }
 
     // MARK: - General Tab

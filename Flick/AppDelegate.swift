@@ -4,12 +4,15 @@
 //
 
 import AppKit
+import Carbon
 import SwiftUI
 
+@MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var hotkeyManager: GlobalHotkeyManager?
     private let floatingPanel = FloatingPanelController()
+    private let voiceDictation = VoiceDictationCoordinator()
     private var settingsWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -34,9 +37,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func setupHotkey() {
-        hotkeyManager = GlobalHotkeyManager { [weak self] in
-            self?.handleHotkeyTriggered()
-        }
+        let manager = GlobalHotkeyManager()
+        manager.register(
+            keyCode: UInt32(kVK_ANSI_E),
+            modifiers: UInt32(cmdKey),
+            onPressed: { [weak self] in self?.handleHotkeyTriggered() }
+        )
+        manager.register(
+            keyCode: UInt32(kVK_ANSI_D),
+            modifiers: UInt32(cmdKey | shiftKey),
+            onPressed: { [weak self] in self?.voiceDictation.startRecording() },
+            onReleased: { [weak self] in self?.voiceDictation.stopRecording() }
+        )
+        hotkeyManager = manager
         hotkeyManager?.start()
     }
 
@@ -71,8 +84,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func checkAccessibilityPermission() {
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): true] as CFDictionary
-        let trusted = AXIsProcessTrustedWithOptions(options)
+        let trusted = TextInjector.ensureAccessibilityPermission()
         if !trusted {
             print("Accessibility permission not granted. System prompt shown.")
         }

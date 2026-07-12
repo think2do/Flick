@@ -18,6 +18,11 @@
 		A1000000000000000000000A /* SettingsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000A /* SettingsManager.swift */; };
 		A1000000000000000000000B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000B /* SettingsView.swift */; };
 		A1000000000000000000000C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000C /* Assets.xcassets */; };
+		A10000000000000000000010 /* AudioRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000010 /* AudioRecorder.swift */; };
+		A10000000000000000000011 /* TranscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000011 /* TranscriptionService.swift */; };
+		A10000000000000000000012 /* TextInjector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000012 /* TextInjector.swift */; };
+		A10000000000000000000013 /* VoiceStatusOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000013 /* VoiceStatusOverlay.swift */; };
+		A10000000000000000000014 /* VoiceDictationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000014 /* VoiceDictationCoordinator.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -36,6 +41,11 @@
 		A2000000000000000000000D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A2000000000000000000000E /* Flick.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Flick.entitlements; sourceTree = "<group>"; };
 		A2000000000000000000000F /* Flick.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Flick.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A20000000000000000000010 /* AudioRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRecorder.swift; sourceTree = "<group>"; };
+		A20000000000000000000011 /* TranscriptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionService.swift; sourceTree = "<group>"; };
+		A20000000000000000000012 /* TextInjector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextInjector.swift; sourceTree = "<group>"; };
+		A20000000000000000000013 /* VoiceStatusOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceStatusOverlay.swift; sourceTree = "<group>"; };
+		A20000000000000000000014 /* VoiceDictationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceDictationCoordinator.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -44,8 +54,9 @@
 
 /* Begin PBXGroup section */
 		A40000000000000000000001 = {isa = PBXGroup; children = (A40000000000000000000002 /* Flick */, A40000000000000000000003 /* Products */); sourceTree = "<group>"; };
-		A40000000000000000000002 /* Flick */ = {isa = PBXGroup; children = (A20000000000000000000001, A20000000000000000000002, A20000000000000000000003, A20000000000000000000004, A20000000000000000000005, A20000000000000000000006, A20000000000000000000007, A20000000000000000000008, A20000000000000000000009, A2000000000000000000000A, A2000000000000000000000B, A2000000000000000000000C, A2000000000000000000000D, A2000000000000000000000E); path = Flick; sourceTree = "<group>"; };
+		A40000000000000000000002 /* Flick */ = {isa = PBXGroup; children = (A20000000000000000000001, A20000000000000000000002, A20000000000000000000003, A20000000000000000000004, A20000000000000000000005, A20000000000000000000006, A20000000000000000000007, A20000000000000000000008, A20000000000000000000009, A2000000000000000000000A, A2000000000000000000000B, A40000000000000000000004 /* VoiceDictation */, A2000000000000000000000C, A2000000000000000000000D, A2000000000000000000000E); path = Flick; sourceTree = "<group>"; };
 		A40000000000000000000003 /* Products */ = {isa = PBXGroup; children = (A2000000000000000000000F /* Flick.app */); name = Products; sourceTree = "<group>"; };
+		A40000000000000000000004 /* VoiceDictation */ = {isa = PBXGroup; children = (A20000000000000000000010, A20000000000000000000011, A20000000000000000000012, A20000000000000000000013, A20000000000000000000014); path = VoiceDictation; sourceTree = "<group>"; };
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -61,7 +72,7 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		A60000000000000000000001 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000001, A10000000000000000000002, A10000000000000000000003, A10000000000000000000004, A10000000000000000000005, A10000000000000000000006, A10000000000000000000007, A10000000000000000000008, A10000000000000000000009, A1000000000000000000000A, A1000000000000000000000B); runOnlyForDeploymentPostprocessing = 0; };
+		A60000000000000000000001 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000001, A10000000000000000000002, A10000000000000000000003, A10000000000000000000004, A10000000000000000000005, A10000000000000000000006, A10000000000000000000007, A10000000000000000000008, A10000000000000000000009, A1000000000000000000000A, A1000000000000000000000B, A10000000000000000000010, A10000000000000000000011, A10000000000000000000012, A10000000000000000000013, A10000000000000000000014); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
