@@ -48,21 +48,24 @@ class AIService: ObservableObject {
                     userContent: userContent,
                     enableReasoning: settings.enableReasoning,
                     onReasoningDelta: { [weak self] reasoning in
+                        guard let service = self else { return }
                         await MainActor.run {
-                            self?.isReasoning = true
-                            self?.reasoningText += reasoning
+                            service.isReasoning = true
+                            service.reasoningText += reasoning
                         }
                     },
                     onContentDelta: { [weak self] content in
+                        guard let service = self else { return }
                         await MainActor.run {
-                            self?.isReasoning = false
-                            self?.responseText += content
+                            service.isReasoning = false
+                            service.responseText += content
                         }
                     }
                 )
+                guard let service = self else { return }
                 await MainActor.run {
-                    self?.isReasoning = false
-                    self?.isLoading = false
+                    service.isReasoning = false
+                    service.isLoading = false
                 }
             } catch is CancellationError {
                 // cancelled
