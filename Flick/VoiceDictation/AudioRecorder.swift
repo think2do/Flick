@@ -43,8 +43,8 @@ final class AudioRecorder {
         }
 
         let input = engine.inputNode
-        let format = input.outputFormat(forBus: 0)
-        guard format.sampleRate > 0, format.channelCount > 0 else {
+        let inputFormat = input.outputFormat(forBus: 0)
+        guard inputFormat.sampleRate > 0, inputFormat.channelCount > 0 else {
             let error = NSError(
                 domain: "Flick.AudioRecorder",
                 code: 1,
@@ -58,19 +58,62 @@ final class AudioRecorder {
             .appendingPathExtension("wav")
 
         do {
+            guard let outputFormat = AVAudioFormat(
+                commonFormat: .pcmFormatInt16,
+                sampleRate: 16_000,
+                channels: 1,
+                interleaved: true
+            ), let converter = AVAudioConverter(from: inputFormat, to: outputFormat) else {
+                throw NSError(
+                    domain: "Flick.AudioRecorder",
+                    code: 2,
+                    userInfo: [NSLocalizedDescriptionKey: "无法创建麦克风音频格式转换器。"]
+                )
+            }
             let file = try AVAudioFile(
                 forWriting: url,
-                settings: format.settings,
-                commonFormat: format.commonFormat,
-                interleaved: format.isInterleaved
+                settings: outputFormat.settings,
+                commonFormat: outputFormat.commonFormat,
+                interleaved: outputFormat.isInterleaved
             )
             audioFile = file
             recordingURL = url
-            input.installTap(onBus: 0, bufferSize: 4096, format: format) { [weak self] buffer, _ in
+            input.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { buffer, _ in
+                let frameCapacity = AVAudioFrameCount(
+                    ceil(Double(buffer.frameLength) * outputFormat.sampleRate / inputFormat.sampleRate)
+                ) + 32
+                guard let convertedBuffer = AVAudioPCMBuffer(
+                    pcmFormat: outputFormat,
+                    frameCapacity: frameCapacity
+                ) else { return }
+
+                var conversionError: NSError?
+                var suppliedInput = false
+                let status = converter.convert(
+                    to: convertedBuffer,
+                    error: &conversionError
+                ) { _, inputStatus in
+                    guard !suppliedInput else {
+                        inputStatus.pointee = .noDataNow
+                        return nil
+                    }
+                    suppliedInput = true
+                    inputStatus.pointee = .haveData
+                    return buffer
+                }
                 do {
-                    try self?.audioFile?.write(from: buffer)
+                    if status == .error {
+                        throw conversionError ?? NSError(
+                            domain: "Flick.AudioRecorder",
+                            code: 3,
+                            userInfo: [NSLocalizedDescriptionKey: "音频格式转换失败。"]
+                        )
+                    }
+                    if convertedBuffer.frameLength > 0 {
+                        try file.write(from: convertedBuffer)
+                    }
                 } catch {
-                    print("[Flick] Failed to write audio buffer: \(error)")
+                    print("[Flick] Failed to convert/write audio buffer: \(error)")
                 }
             }
             engine.prepare()

@@ -34,6 +34,7 @@ struct TranscriptionService {
         }
 
         let audioData = try Data(contentsOf: audioURL)
+        print("[Flick] Transcribing \(audioData.count) bytes with model \(model)")
         let payload: [String: Any] = [
             "model": model,
             "input_audio": [
@@ -53,6 +54,7 @@ struct TranscriptionService {
         }
         guard (200..<300).contains(httpResponse.statusCode) else {
             let message = Self.errorMessage(from: data)
+            print("[Flick] Transcription HTTP \(httpResponse.statusCode): \(message)")
             throw TranscriptionError.httpError(httpResponse.statusCode, message)
         }
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
