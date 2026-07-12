@@ -13,6 +13,7 @@ struct SettingsView: View {
     @State private var isFetchingModels = false
     @State private var fetchError: String?
     @State private var editingPrompt: CustomPrompt?
+    @State private var editingVoiceProfile: VoiceDictationProfile?
     @State private var isModelLibraryPresented = false
     @State private var fetchModelsTask: Task<Void, Never>?
     @State private var fetchGeneration = 0
@@ -54,6 +55,23 @@ struct SettingsView: View {
                 }
             )
         }
+        .sheet(item: $editingVoiceProfile) { profile in
+            VoiceProfileEditorSheet(
+                profile: profile,
+                reservedHotkeys: [settings.selectionHotkeyConfig] + settings.voiceDictationProfiles
+                    .filter { $0.id != profile.id }
+                    .map(\.hotkey),
+                onSave: { updated in
+                    if let index = settings.voiceDictationProfiles.firstIndex(where: { $0.id == updated.id }) {
+                        settings.voiceDictationProfiles[index] = updated
+                    } else {
+                        settings.voiceDictationProfiles.append(updated)
+                    }
+                    editingVoiceProfile = nil
+                },
+                onCancel: { editingVoiceProfile = nil }
+            )
+        }
         .sheet(isPresented: $isModelLibraryPresented) {
             ModelLibrarySheet(
                 models: availableModels,
@@ -73,29 +91,57 @@ struct SettingsView: View {
 
     private var voiceTab: some View {
         Form {
-            Section("模型") {
-                TextField("转写模型", text: $settings.transcriptionModel)
-                    .textFieldStyle(.roundedBorder)
-                TextField("润色模型", text: $settings.voicePolishingModel)
-                    .textFieldStyle(.roundedBorder)
-            }
-
-            Section("快捷键") {
-                HStack {
-                    Text("按住说话")
-                    Spacer()
-                    HotkeyRecorderButton(config: settings.voiceHotkeyConfig) { config in
-                        updateHotkey(config, forVoice: true)
+            Section("听写功能") {
+                ForEach(settings.voiceDictationProfiles) { profile in
+                    HStack(spacing: 10) {
+                        Image(systemName: "waveform")
+                            .frame(width: 22)
+                            .foregroundStyle(.secondary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(profile.name).font(.body)
+                            Text("\(displayModelName(profile.transcriptionModel)) → \(displayModelName(profile.polishingModel))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                        Spacer()
+                        Text(profile.hotkey.displayName)
+                            .font(.caption.monospaced())
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(Color.secondary.opacity(0.1))
+                            .clipShape(RoundedRectangle(cornerRadius: 5))
+                        Button {
+                            editingVoiceProfile = profile
+                        } label: {
+                            Image(systemName: "pencil")
+                        }
+                        .buttonStyle(.plain)
+                        Button {
+                            settings.voiceDictationProfiles.removeAll { $0.id == profile.id }
+                        } label: {
+                            Image(systemName: "trash")
+                                .foregroundStyle(.red.opacity(0.7))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(settings.voiceDictationProfiles.count == 1)
                     }
-                    Button("恢复默认") {
-                        updateHotkey(.voiceDefault, forVoice: true)
-                    }
-                    .controlSize(.small)
+                    .padding(.vertical, 3)
                 }
-                if let hotkeyError {
-                    Text(hotkeyError)
-                        .font(.caption)
-                        .foregroundStyle(.red)
+                .onMove { source, destination in
+                    settings.voiceDictationProfiles.move(fromOffsets: source, toOffset: destination)
+                }
+
+                Button {
+                    editingVoiceProfile = VoiceDictationProfile(
+                        name: "",
+                        hotkey: .voiceDefault,
+                        transcriptionModel: "openai/whisper-large-v3",
+                        polishingModel: settings.modelName,
+                        polishingPrompt: VoiceDictationProfile.defaultPolishingPrompt
+                    )
+                } label: {
+                    Label("添加听写功能", systemImage: "plus")
                 }
             }
 
@@ -104,9 +150,14 @@ struct SettingsView: View {
             }
 
             Section("说明") {
-                Text("听写使用上方通用设置中的 API Key 和基础地址。松开快捷键后，Flick 会转写、整理并把文字输入到原来的光标位置。")
+                Text("每个听写功能拥有独立的按住说话快捷键、语音转写模型、文本润色模型和润色提示词，并共用通用页面中的 API 配置。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                if settings.voiceDictationProfiles.count == 1 {
+                    Text("至少需要保留一个听写功能。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .formStyle(.grouped)
@@ -158,18 +209,15 @@ struct SettingsView: View {
         .formStyle(.grouped)
     }
 
-    private func updateHotkey(_ config: HotkeyConfig, forVoice: Bool) {
-        let other = forVoice ? settings.selectionHotkeyConfig : settings.voiceHotkeyConfig
-        guard config.keyCode != other.keyCode || config.modifiers != other.modifiers else {
-            hotkeyError = "两个功能不能使用相同的快捷键。"
+    private func updateSelectionHotkey(_ config: HotkeyConfig) {
+        guard !settings.voiceDictationProfiles.contains(where: {
+            $0.hotkey.keyCode == config.keyCode && $0.hotkey.modifiers == config.modifiers
+        }) else {
+            hotkeyError = "划词与听写功能不能使用相同的快捷键。"
             return
         }
         hotkeyError = nil
-        if forVoice {
-            settings.voiceHotkeyConfig = config
-        } else {
-            settings.selectionHotkeyConfig = config
-        }
+        settings.selectionHotkeyConfig = config
     }
 
     // MARK: - Selection Tab
@@ -215,10 +263,10 @@ struct SettingsView: View {
                     Text("划词处理")
                     Spacer()
                     HotkeyRecorderButton(config: settings.selectionHotkeyConfig) { config in
-                        updateHotkey(config, forVoice: false)
+                        updateSelectionHotkey(config)
                     }
                     Button("恢复默认") {
-                        updateHotkey(.selectionDefault, forVoice: false)
+                        updateSelectionHotkey(.selectionDefault)
                     }
                     .controlSize(.small)
                 }
@@ -516,6 +564,99 @@ private struct HotkeyRecorderButton: View {
             else { return nil }
             return characters.uppercased()
         }
+    }
+}
+
+private struct VoiceProfileEditorSheet: View {
+    @State private var profile: VoiceDictationProfile
+    let reservedHotkeys: [HotkeyConfig]
+    let onSave: (VoiceDictationProfile) -> Void
+    let onCancel: () -> Void
+
+    init(
+        profile: VoiceDictationProfile,
+        reservedHotkeys: [HotkeyConfig],
+        onSave: @escaping (VoiceDictationProfile) -> Void,
+        onCancel: @escaping () -> Void
+    ) {
+        _profile = State(initialValue: profile)
+        self.reservedHotkeys = reservedHotkeys
+        self.onSave = onSave
+        self.onCancel = onCancel
+    }
+
+    private var hotkeyConflicts: Bool {
+        reservedHotkeys.contains {
+            $0.keyCode == profile.hotkey.keyCode && $0.modifiers == profile.hotkey.modifiers
+        }
+    }
+
+    private var canSave: Bool {
+        !profile.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !profile.transcriptionModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !profile.polishingModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !profile.polishingPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !hotkeyConflicts
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Form {
+                Section("基本信息") {
+                    TextField("功能名称", text: $profile.name)
+                        .textFieldStyle(.roundedBorder)
+                }
+
+                Section("自定义按键") {
+                    HStack {
+                        Text("按住说话")
+                        Spacer()
+                        HotkeyRecorderButton(config: profile.hotkey) { config in
+                            profile.hotkey = config
+                        }
+                    }
+                    if hotkeyConflicts {
+                        Text("该快捷键已被划词或其他听写功能使用。")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+                }
+
+                Section("模型选择") {
+                    TextField("语音转写模型", text: $profile.transcriptionModel)
+                        .textFieldStyle(.roundedBorder)
+                    TextField("文本润色模型", text: $profile.polishingModel)
+                        .textFieldStyle(.roundedBorder)
+                }
+
+                Section("润色提示词") {
+                    TextEditor(text: $profile.polishingPrompt)
+                        .font(.body)
+                        .frame(minHeight: 120)
+                        .border(Color.secondary.opacity(0.2))
+                }
+            }
+            .formStyle(.grouped)
+
+            Divider()
+            HStack {
+                Button("取消", action: onCancel)
+                    .keyboardShortcut(.cancelAction)
+                Spacer()
+                Button("保存") {
+                    profile.name = profile.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                    profile.transcriptionModel = profile.transcriptionModel
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    profile.polishingModel = profile.polishingModel
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    onSave(profile)
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(!canSave)
+            }
+            .padding(12)
+        }
+        .frame(width: 480, height: 480)
     }
 }
 

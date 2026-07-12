@@ -46,6 +46,40 @@ struct HotkeyConfig: Codable, Equatable {
     )
 }
 
+struct VoiceDictationProfile: Identifiable, Codable, Equatable {
+    var id: UUID
+    var name: String
+    var hotkey: HotkeyConfig
+    var transcriptionModel: String
+    var polishingModel: String
+    var polishingPrompt: String
+
+    init(
+        id: UUID = UUID(),
+        name: String,
+        hotkey: HotkeyConfig,
+        transcriptionModel: String,
+        polishingModel: String,
+        polishingPrompt: String
+    ) {
+        self.id = id
+        self.name = name
+        self.hotkey = hotkey
+        self.transcriptionModel = transcriptionModel
+        self.polishingModel = polishingModel
+        self.polishingPrompt = polishingPrompt
+    }
+
+    static let defaultPolishingPrompt = """
+    你是语音听写整理助手。请把用户的口语转写整理成可直接使用的书面文本：
+    - 删除无意义的口头禅、语气词和重复内容；
+    - 正确处理说话者的自我纠正，只保留最终表达；
+    - 修正明显的转写错误、标点和基本格式；
+    - 保持原意、语言和语气，不添加解释或新信息；
+    - 只输出整理后的正文。
+    """
+}
+
 class SettingsManager: ObservableObject {
     static let shared = SettingsManager()
 
@@ -60,6 +94,7 @@ class SettingsManager: ObservableObject {
         static let favoriteModels = "favoriteModels"
         static let transcriptionModel = "transcriptionModel"
         static let voicePolishingModel = "voicePolishingModel"
+        static let voiceDictationProfiles = "voiceDictationProfiles"
         static let voicePreviewEnabled = "voicePreviewEnabled"
     }
 
@@ -101,20 +136,12 @@ class SettingsManager: ObservableObject {
         }
     }
 
-    @Published var voiceHotkeyConfig: HotkeyConfig {
+    @Published var voiceDictationProfiles: [VoiceDictationProfile] {
         didSet {
-            if let data = try? JSONEncoder().encode(voiceHotkeyConfig) {
-                UserDefaults.standard.set(data, forKey: Keys.voiceHotkeyConfig)
+            if let data = try? JSONEncoder().encode(voiceDictationProfiles) {
+                UserDefaults.standard.set(data, forKey: Keys.voiceDictationProfiles)
             }
         }
-    }
-
-    @Published var transcriptionModel: String {
-        didSet { UserDefaults.standard.set(transcriptionModel, forKey: Keys.transcriptionModel) }
-    }
-
-    @Published var voicePolishingModel: String {
-        didSet { UserDefaults.standard.set(voicePolishingModel, forKey: Keys.voicePolishingModel) }
     }
 
     @Published var voicePreviewEnabled: Bool {
@@ -127,11 +154,6 @@ class SettingsManager: ObservableObject {
         self.apiKey = KeychainHelper.read(key: Keys.apiKey) ?? ""
         self.enableReasoning = UserDefaults.standard.bool(forKey: Keys.enableReasoning)
         self.favoriteModels = UserDefaults.standard.stringArray(forKey: Keys.favoriteModels) ?? []
-        self.transcriptionModel = UserDefaults.standard.string(forKey: Keys.transcriptionModel)
-            ?? "openai/whisper-large-v3"
-        self.voicePolishingModel = UserDefaults.standard.string(forKey: Keys.voicePolishingModel)
-            ?? UserDefaults.standard.string(forKey: Keys.modelName)
-            ?? "gpt-4o"
         self.voicePreviewEnabled = UserDefaults.standard.bool(forKey: Keys.voicePreviewEnabled)
 
         if let data = UserDefaults.standard.data(forKey: Keys.customPrompts),
@@ -148,11 +170,31 @@ class SettingsManager: ObservableObject {
             self.selectionHotkeyConfig = HotkeyConfig.selectionDefault
         }
 
-        if let data = UserDefaults.standard.data(forKey: Keys.voiceHotkeyConfig),
-           let config = try? JSONDecoder().decode(HotkeyConfig.self, from: data) {
-            self.voiceHotkeyConfig = config
+        if let data = UserDefaults.standard.data(forKey: Keys.voiceDictationProfiles),
+           let profiles = try? JSONDecoder().decode([VoiceDictationProfile].self, from: data),
+           !profiles.isEmpty {
+            self.voiceDictationProfiles = profiles
         } else {
-            self.voiceHotkeyConfig = HotkeyConfig.voiceDefault
+            let legacyHotkey: HotkeyConfig
+            if let data = UserDefaults.standard.data(forKey: Keys.voiceHotkeyConfig),
+               let config = try? JSONDecoder().decode(HotkeyConfig.self, from: data) {
+                legacyHotkey = config
+            } else {
+                legacyHotkey = .voiceDefault
+            }
+            self.voiceDictationProfiles = [VoiceDictationProfile(
+                name: "语音听写",
+                hotkey: legacyHotkey,
+                transcriptionModel: UserDefaults.standard.string(forKey: Keys.transcriptionModel)
+                    ?? "openai/whisper-large-v3",
+                polishingModel: UserDefaults.standard.string(forKey: Keys.voicePolishingModel)
+                    ?? UserDefaults.standard.string(forKey: Keys.modelName)
+                    ?? "gpt-4o",
+                polishingPrompt: VoiceDictationProfile.defaultPolishingPrompt
+            )]
+        }
+        if let data = try? JSONEncoder().encode(voiceDictationProfiles) {
+            UserDefaults.standard.set(data, forKey: Keys.voiceDictationProfiles)
         }
     }
 

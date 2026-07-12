@@ -3,27 +3,18 @@ import Foundation
 
 @MainActor
 final class VoiceDictationCoordinator {
-    private enum Prompt {
-        static let polish = """
-        你是语音听写整理助手。请把用户的口语转写整理成可直接使用的书面文本：
-        - 删除无意义的口头禅、语气词和重复内容；
-        - 正确处理说话者的自我纠正，只保留最终表达；
-        - 修正明显的转写错误、标点和基本格式；
-        - 保持原意、语言和语气，不添加解释或新信息；
-        - 只输出整理后的正文。
-        """
-    }
-
     private let recorder = AudioRecorder()
     private let transcriptionService = TranscriptionService()
     private let overlay = VoiceStatusOverlayController()
     private var processingTask: Task<Void, Never>?
     private var targetApplication: NSRunningApplication?
     private var isHotkeyHeld = false
+    private var activeProfile: VoiceDictationProfile?
 
-    func startRecording() {
+    func startRecording(profile: VoiceDictationProfile) {
         guard processingTask == nil else { return }
         isHotkeyHeld = true
+        activeProfile = profile
         targetApplication = NSWorkspace.shared.frontmostApplication
         processingTask = Task { [weak self] in
             guard let self else { return }
@@ -34,36 +25,40 @@ final class VoiceDictationCoordinator {
                 } else {
                     let audioURL = try recorder.stop()
                     processingTask = Task { [weak self] in
-                        await self?.process(audioURL: audioURL)
+                        await self?.process(audioURL: audioURL, profile: profile)
                     }
                 }
             } catch {
                 showError(error.localizedDescription)
                 processingTask = nil
+                activeProfile = nil
             }
         }
     }
 
-    func stopRecording() {
+    func stopRecording(profileID: UUID) {
         isHotkeyHeld = false
-        guard recorder.state == .recording else { return }
+        guard activeProfile?.id == profileID, recorder.state == .recording,
+              let profile = activeProfile else { return }
         do {
             let audioURL = try recorder.stop()
             processingTask = Task { [weak self] in
-                await self?.process(audioURL: audioURL)
+                await self?.process(audioURL: audioURL, profile: profile)
             }
         } catch {
             showError(error.localizedDescription)
             processingTask = nil
+            activeProfile = nil
         }
     }
 
-    private func process(audioURL: URL) async {
+    private func process(audioURL: URL, profile: VoiceDictationProfile) async {
         defer { try? FileManager.default.removeItem(at: audioURL) }
         let settings = SettingsManager.shared
         guard !settings.apiKey.isEmpty else {
             showError("请先在设置中填写 API Key。")
             processingTask = nil
+            activeProfile = nil
             return
         }
         do {
@@ -72,14 +67,14 @@ final class VoiceDictationCoordinator {
                 audioURL: audioURL,
                 baseURL: settings.apiBaseURL,
                 apiKey: settings.apiKey,
-                model: settings.transcriptionModel
+                model: profile.transcriptionModel
             )
             overlay.show(.polishing)
             let polished = try await AIService.streamChat(
                 baseURL: settings.apiBaseURL,
                 apiKey: settings.apiKey,
-                model: settings.voicePolishingModel,
-                systemPrompt: Prompt.polish,
+                model: profile.polishingModel,
+                systemPrompt: profile.polishingPrompt,
                 userContent: transcript,
                 enableReasoning: false
             ).trimmingCharacters(in: .whitespacesAndNewlines)
@@ -94,9 +89,11 @@ final class VoiceDictationCoordinator {
         } catch is CancellationError {
             overlay.close()
             processingTask = nil
+            activeProfile = nil
         } catch {
             showError(error.localizedDescription)
             processingTask = nil
+            activeProfile = nil
         }
     }
 
@@ -107,6 +104,7 @@ final class VoiceDictationCoordinator {
             onCancel: { [weak self] in
                 self?.overlay.close()
                 self?.processingTask = nil
+                self?.activeProfile = nil
             }
         )
     }
@@ -122,6 +120,7 @@ final class VoiceDictationCoordinator {
                 self?.showError(error.localizedDescription)
             }
             self?.processingTask = nil
+            self?.activeProfile = nil
         }
     }
 

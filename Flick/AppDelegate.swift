@@ -48,19 +48,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             modifiers: settings.selectionHotkeyConfig.modifiers,
             onPressed: { [weak self] in self?.handleHotkeyTriggered() }
         )
-        manager.register(
-            keyCode: settings.voiceHotkeyConfig.keyCode,
-            modifiers: settings.voiceHotkeyConfig.modifiers,
-            onPressed: { [weak self] in self?.voiceDictation.startRecording() },
-            onReleased: { [weak self] in self?.voiceDictation.stopRecording() }
-        )
+        for profile in settings.voiceDictationProfiles {
+            manager.register(
+                keyCode: profile.hotkey.keyCode,
+                modifiers: profile.hotkey.modifiers,
+                onPressed: { [weak self] in
+                    self?.voiceDictation.startRecording(profile: profile)
+                },
+                onReleased: { [weak self] in
+                    self?.voiceDictation.stopRecording(profileID: profile.id)
+                }
+            )
+        }
         hotkeyManager = manager
         hotkeyManager?.start()
     }
 
     private func observeHotkeyChanges() {
         SettingsManager.shared.$selectionHotkeyConfig
-            .combineLatest(SettingsManager.shared.$voiceHotkeyConfig)
+            .combineLatest(SettingsManager.shared.$voiceDictationProfiles)
             .dropFirst()
             .receive(on: RunLoop.main)
             .sink { [weak self] _, _ in self?.setupHotkey() }
