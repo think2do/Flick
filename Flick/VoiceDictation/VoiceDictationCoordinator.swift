@@ -13,6 +13,20 @@ final class VoiceDictationCoordinator {
     private var activeProfile: VoiceDictationProfile?
     private var isUsingLocalSpeech = false
 
+    func toggleRecording(profile: VoiceDictationProfile) {
+        if activeProfile?.id == profile.id {
+            if recorder.state == .recording {
+                stopRecording(profileID: profile.id)
+            } else if isHotkeyHeld {
+                // A second Fn press arrived while permissions or audio startup are pending.
+                isHotkeyHeld = false
+            }
+            return
+        }
+        guard activeProfile == nil else { return }
+        startRecording(profile: profile)
+    }
+
     func startRecording(profile: VoiceDictationProfile) {
         guard processingTask == nil else { return }
         isHotkeyHeld = true
@@ -51,9 +65,9 @@ final class VoiceDictationCoordinator {
     }
 
     func stopRecording(profileID: UUID) {
-        isHotkeyHeld = false
         guard activeProfile?.id == profileID, recorder.state == .recording,
               let profile = activeProfile else { return }
+        isHotkeyHeld = false
         do {
             let audioURL = try recorder.stop()
             recorder.onAudioBuffer = nil

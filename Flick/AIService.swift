@@ -87,10 +87,12 @@ class AIService: ObservableObject {
         isReasoning = false
     }
 
-    /// A URLSession that bypasses system proxy to avoid auth header stripping
+    /// Shared session that respects the user's system network and proxy settings.
     static let directSession: URLSession = {
         let config = URLSessionConfiguration.default
-        config.connectionProxyDictionary = [:]
+        config.waitsForConnectivity = true
+        config.timeoutIntervalForRequest = 30
+        config.timeoutIntervalForResource = 180
         return URLSession(configuration: config)
     }()
 

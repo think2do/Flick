@@ -43,22 +43,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         hotkeyManager?.stop()
         let settings = SettingsManager.shared
         let manager = GlobalHotkeyManager()
-        manager.register(
-            keyCode: settings.selectionHotkeyConfig.keyCode,
-            modifiers: settings.selectionHotkeyConfig.modifiers,
-            onPressed: { [weak self] in self?.handleHotkeyTriggered() }
-        )
-        for profile in settings.voiceDictationProfiles {
+        if settings.selectionHotkeyConfig.isFunctionKey {
+            manager.registerFunctionKey { [weak self] in self?.handleHotkeyTriggered() }
+        } else {
             manager.register(
-                keyCode: profile.hotkey.keyCode,
-                modifiers: profile.hotkey.modifiers,
-                onPressed: { [weak self] in
-                    self?.voiceDictation.startRecording(profile: profile)
-                },
-                onReleased: { [weak self] in
-                    self?.voiceDictation.stopRecording(profileID: profile.id)
-                }
+                keyCode: settings.selectionHotkeyConfig.keyCode,
+                modifiers: settings.selectionHotkeyConfig.modifiers,
+                onPressed: { [weak self] in self?.handleHotkeyTriggered() }
             )
+        }
+        for profile in settings.voiceDictationProfiles {
+            if profile.hotkey.isFunctionKey {
+                manager.registerFunctionKey { [weak self] in
+                    self?.voiceDictation.toggleRecording(profile: profile)
+                }
+            } else {
+                manager.register(
+                    keyCode: profile.hotkey.keyCode,
+                    modifiers: profile.hotkey.modifiers,
+                    onPressed: { [weak self] in
+                        self?.voiceDictation.startRecording(profile: profile)
+                    },
+                    onReleased: { [weak self] in
+                        self?.voiceDictation.stopRecording(profileID: profile.id)
+                    }
+                )
+            }
         }
         hotkeyManager = manager
         hotkeyManager?.start()
@@ -88,12 +98,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             settingsWindow.makeKeyAndOrderFront(nil)
         } else {
             let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 520, height: 460),
+                contentRect: NSRect(x: 0, y: 0, width: 700, height: 600),
                 styleMask: [.titled, .closable],
                 backing: .buffered,
                 defer: false
             )
             window.title = "Flick 设置"
+            window.titleVisibility = .hidden
+            window.titlebarAppearsTransparent = true
             window.contentView = NSHostingView(rootView: SettingsView())
             window.center()
             window.isReleasedWhenClosed = false

@@ -30,9 +30,19 @@ struct CustomPrompt: Identifiable, Codable, Equatable {
 }
 
 struct HotkeyConfig: Codable, Equatable {
+    private static let functionOnlyKeyCode = UInt32.max
+
     var keyCode: UInt32
     var modifiers: UInt32
     var displayName: String
+
+    var isFunctionKey: Bool { keyCode == Self.functionOnlyKeyCode }
+
+    static let functionKey = HotkeyConfig(
+        keyCode: functionOnlyKeyCode,
+        modifiers: 0,
+        displayName: "Fn"
+    )
 
     static let selectionDefault = HotkeyConfig(
         keyCode: UInt32(kVK_ANSI_E),

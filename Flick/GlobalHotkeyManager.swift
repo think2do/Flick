@@ -19,6 +19,10 @@ final class GlobalHotkeyManager {
 
     private var registrations: [UInt32: Registration] = [:]
     private var eventHandlerRef: EventHandlerRef?
+    private var functionKeyCallback: (() -> Void)?
+    private var functionKeyEventTap: CFMachPort?
+    private var functionKeyRunLoopSource: CFRunLoopSource?
+    private var isFunctionKeyDown = false
     private var nextID: UInt32 = 1
     private var isStarted = false
 
@@ -59,6 +63,13 @@ final class GlobalHotkeyManager {
             registerHotKey(id: id)
         }
         return id
+    }
+
+    func registerFunctionKey(onPressed: @escaping () -> Void) {
+        functionKeyCallback = onPressed
+        if isStarted {
+            installFunctionKeyEventTap()
+        }
     }
 
     func start() {
@@ -103,6 +114,7 @@ final class GlobalHotkeyManager {
         for id in registrations.keys.sorted() {
             registerHotKey(id: id)
         }
+        installFunctionKeyEventTap()
         print("[Flick] Global hotkey handler installed")
     }
 
@@ -116,7 +128,73 @@ final class GlobalHotkeyManager {
             RemoveEventHandler(eventHandlerRef)
             self.eventHandlerRef = nil
         }
+        if let functionKeyRunLoopSource {
+            CFRunLoopSourceInvalidate(functionKeyRunLoopSource)
+            self.functionKeyRunLoopSource = nil
+        }
+        if let functionKeyEventTap {
+            CFMachPortInvalidate(functionKeyEventTap)
+            self.functionKeyEventTap = nil
+        }
+        isFunctionKeyDown = false
         isStarted = false
+    }
+
+    private func installFunctionKeyEventTap() {
+        guard functionKeyCallback != nil, functionKeyEventTap == nil else { return }
+        let mask = CGEventMask(1) << CGEventType.flagsChanged.rawValue
+        let callback: CGEventTapCallBack = { _, type, event, userInfo in
+            guard let userInfo else { return Unmanaged.passUnretained(event) }
+            let manager = Unmanaged<GlobalHotkeyManager>
+                .fromOpaque(userInfo)
+                .takeUnretainedValue()
+
+            if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+                if let tap = manager.functionKeyEventTap {
+                    CGEvent.tapEnable(tap: tap, enable: true)
+                }
+                return Unmanaged.passUnretained(event)
+            }
+
+            guard type == .flagsChanged else { return Unmanaged.passUnretained(event) }
+            if manager.handleFunctionKeyFlags(event.flags) {
+                return nil
+            }
+            return Unmanaged.passUnretained(event)
+        }
+
+        guard let tap = CGEvent.tapCreate(
+            tap: .cgSessionEventTap,
+            place: .headInsertEventTap,
+            options: .defaultTap,
+            eventsOfInterest: mask,
+            callback: callback,
+            userInfo: Unmanaged.passUnretained(self).toOpaque()
+        ) else {
+            print("[Flick] Unable to create Fn event tap; Accessibility permission may be missing")
+            return
+        }
+
+        let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
+        functionKeyEventTap = tap
+        functionKeyRunLoopSource = source
+        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
+        CGEvent.tapEnable(tap: tap, enable: true)
+        print("[Flick] Fn event tap installed")
+    }
+
+    private func handleFunctionKeyFlags(_ flags: CGEventFlags) -> Bool {
+        let isDown = flags.contains(.maskSecondaryFn)
+        guard isDown != isFunctionKeyDown else { return false }
+        isFunctionKeyDown = isDown
+        guard functionKeyCallback != nil else { return false }
+        if isDown {
+            DispatchQueue.main.async { [weak self] in
+                self?.functionKeyCallback?()
+            }
+        }
+        // Fn is reserved by Flick while configured, avoiding Globe/Emoji side effects.
+        return true
     }
 
     private func registerHotKey(id: UInt32) {
