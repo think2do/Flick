@@ -26,6 +26,8 @@
 	<string></string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Flick 使用麦克风将你的语音转换为文字。</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Flick 使用设备端语音识别来实时生成听写文字。</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 </dict>

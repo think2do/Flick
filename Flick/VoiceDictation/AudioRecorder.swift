@@ -27,6 +27,7 @@ final class AudioRecorder {
     }
 
     var onStateChange: ((State) -> Void)?
+    var onAudioBuffer: ((AVAudioPCMBuffer) -> Void)?
 
     private let engine = AVAudioEngine()
     private var audioFile: AVAudioFile?
@@ -78,7 +79,9 @@ final class AudioRecorder {
             )
             audioFile = file
             recordingURL = url
+            let audioBufferHandler = onAudioBuffer
             input.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { buffer, _ in
+                audioBufferHandler?(buffer)
                 let frameCapacity = AVAudioFrameCount(
                     ceil(Double(buffer.frameLength) * outputFormat.sampleRate / inputFormat.sampleRate)
                 ) + 32

@@ -5,11 +5,13 @@ import Foundation
 final class VoiceDictationCoordinator {
     private let recorder = AudioRecorder()
     private let transcriptionService = TranscriptionService()
+    private let localSpeechTranscriber = LocalSpeechTranscriber()
     private let overlay = VoiceStatusOverlayController()
     private var processingTask: Task<Void, Never>?
     private var targetApplication: NSRunningApplication?
     private var isHotkeyHeld = false
     private var activeProfile: VoiceDictationProfile?
+    private var isUsingLocalSpeech = false
 
     func startRecording(profile: VoiceDictationProfile) {
         guard processingTask == nil else { return }
@@ -19,19 +21,31 @@ final class VoiceDictationCoordinator {
         processingTask = Task { [weak self] in
             guard let self else { return }
             do {
+                isUsingLocalSpeech = await localSpeechTranscriber.start(localeIdentifier: "zh-CN")
+                recorder.onAudioBuffer = isUsingLocalSpeech ? { [weak transcriber = localSpeechTranscriber] buffer in
+                    transcriber?.append(buffer)
+                } : nil
                 try await recorder.start()
                 if isHotkeyHeld {
                     overlay.show(.recording)
                 } else {
                     let audioURL = try recorder.stop()
+                    recorder.onAudioBuffer = nil
+                    let useLocalSpeech = isUsingLocalSpeech
                     processingTask = Task { [weak self] in
-                        await self?.process(audioURL: audioURL, profile: profile)
+                        await self?.process(
+                            audioURL: audioURL,
+                            profile: profile,
+                            useLocalSpeech: useLocalSpeech
+                        )
                     }
                 }
             } catch {
                 showError(error.localizedDescription)
                 processingTask = nil
                 activeProfile = nil
+                recorder.onAudioBuffer = nil
+                localSpeechTranscriber.cancel()
             }
         }
     }
@@ -42,18 +56,33 @@ final class VoiceDictationCoordinator {
               let profile = activeProfile else { return }
         do {
             let audioURL = try recorder.stop()
+            recorder.onAudioBuffer = nil
+            let useLocalSpeech = isUsingLocalSpeech
             processingTask = Task { [weak self] in
-                await self?.process(audioURL: audioURL, profile: profile)
+                await self?.process(
+                    audioURL: audioURL,
+                    profile: profile,
+                    useLocalSpeech: useLocalSpeech
+                )
             }
         } catch {
             showError(error.localizedDescription)
             processingTask = nil
             activeProfile = nil
+            recorder.onAudioBuffer = nil
+            localSpeechTranscriber.cancel()
         }
     }
 
-    private func process(audioURL: URL, profile: VoiceDictationProfile) async {
-        defer { try? FileManager.default.removeItem(at: audioURL) }
+    private func process(
+        audioURL: URL,
+        profile: VoiceDictationProfile,
+        useLocalSpeech: Bool
+    ) async {
+        defer {
+            localSpeechTranscriber.cancel()
+            try? FileManager.default.removeItem(at: audioURL)
+        }
         let settings = SettingsManager.shared
         guard !settings.apiKey.isEmpty else {
             showError("请先在设置中填写 API Key。")
@@ -63,11 +92,11 @@ final class VoiceDictationCoordinator {
         }
         do {
             overlay.show(.transcribing)
-            let transcript = try await transcriptionService.transcribe(
+            let transcript = try await transcript(
                 audioURL: audioURL,
-                baseURL: settings.apiBaseURL,
-                apiKey: settings.apiKey,
-                model: profile.transcriptionModel
+                profile: profile,
+                settings: settings,
+                preferLocal: useLocalSpeech
             )
             overlay.show(.polishing)
             let polished = try await AIService.streamChat(
@@ -95,6 +124,30 @@ final class VoiceDictationCoordinator {
             processingTask = nil
             activeProfile = nil
         }
+    }
+
+    private func transcript(
+        audioURL: URL,
+        profile: VoiceDictationProfile,
+        settings: SettingsManager,
+        preferLocal: Bool
+    ) async throws -> String {
+        if preferLocal {
+            do {
+                let text = try await localSpeechTranscriber.finish()
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                if !text.isEmpty { return text }
+            } catch {
+                print("[Flick] Local Speech failed, falling back to OpenRouter: \(error)")
+            }
+        }
+
+        return try await transcriptionService.transcribe(
+            audioURL: audioURL,
+            baseURL: settings.apiBaseURL,
+            apiKey: settings.apiKey,
+            model: profile.transcriptionModel
+        )
     }
 
     private func showPreview(_ text: String) {
