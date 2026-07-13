@@ -6,6 +6,7 @@
 import AppKit
 import Carbon
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @ObservedObject private var settings = SettingsManager.shared
@@ -23,6 +24,8 @@ struct SettingsView: View {
     @State private var balanceTask: Task<Void, Never>?
     @State private var connectionStatus: ConnectionStatus = .idle
     @State private var selectedTab: SettingsTab = .general
+    @State private var hoveredTab: SettingsTab?
+    @State private var draggingPromptID: UUID?
 
     private enum SettingsTab: String, CaseIterable, Identifiable {
         case general = "通用"
@@ -74,13 +77,22 @@ struct SettingsView: View {
                             }
                             .foregroundStyle(selectedTab == tab ? Color.black : Color.white.opacity(0.64))
                             .padding(.horizontal, 14)
-                            .frame(height: 32)
+                            .frame(minWidth: 82, minHeight: 32, maxHeight: 32)
                             .background(
-                                selectedTab == tab ? FlickStyle.accent : Color.clear,
+                                selectedTab == tab
+                                    ? FlickStyle.accent
+                                    : (hoveredTab == tab ? Color.white.opacity(0.09) : Color.clear),
                                 in: Capsule()
                             )
+                            .contentShape(Capsule())
                         }
                         .buttonStyle(.plain)
+                        .contentShape(Capsule())
+                        .onHover { hovering in
+                            withAnimation(.easeOut(duration: 0.12)) {
+                                hoveredTab = hovering ? tab : (hoveredTab == tab ? nil : hoveredTab)
+                            }
+                        }
                     }
                 }
                 .padding(4)
@@ -398,6 +410,12 @@ struct SettingsView: View {
                         Image(systemName: "line.3.horizontal")
                             .font(.caption)
                             .foregroundStyle(.tertiary)
+                            .frame(width: 24, height: 28)
+                            .contentShape(Rectangle())
+                            .onDrag {
+                                draggingPromptID = prompt.id
+                                return NSItemProvider(object: prompt.id.uuidString as NSString)
+                            }
                         Image(systemName: prompt.icon)
                             .frame(width: 20)
                             .foregroundStyle(.secondary)
@@ -419,9 +437,15 @@ struct SettingsView: View {
                         }
                     }
                     .padding(.vertical, 2)
-                }
-                .onMove { source, destination in
-                    settings.customPrompts.move(fromOffsets: source, toOffset: destination)
+                    .contentShape(Rectangle())
+                    .onDrop(
+                        of: [UTType.text],
+                        delegate: PromptDropDelegate(
+                            targetID: prompt.id,
+                            prompts: $settings.customPrompts,
+                            draggingID: $draggingPromptID
+                        )
+                    )
                 }
 
                 HStack {
@@ -612,6 +636,36 @@ struct SettingsView: View {
         .onTapGesture {
             settings.modelName = model
         }
+    }
+}
+
+private struct PromptDropDelegate: DropDelegate {
+    let targetID: UUID
+    @Binding var prompts: [CustomPrompt]
+    @Binding var draggingID: UUID?
+
+    func dropEntered(info: DropInfo) {
+        guard let draggingID,
+              draggingID != targetID,
+              let sourceIndex = prompts.firstIndex(where: { $0.id == draggingID }),
+              let targetIndex = prompts.firstIndex(where: { $0.id == targetID })
+        else { return }
+
+        withAnimation(.snappy(duration: 0.18)) {
+            prompts.move(
+                fromOffsets: IndexSet(integer: sourceIndex),
+                toOffset: targetIndex > sourceIndex ? targetIndex + 1 : targetIndex
+            )
+        }
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggingID = nil
+        return true
     }
 }
 

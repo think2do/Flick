@@ -1,259 +1,714 @@
-# Flick - macOS AI 文本处理工具
+# Flick
 
-Flick 是一款优雅高效的 **全局AI调用工具**，它将 AI 驱动的文本处理带到你的指尖。只需一个简单的快捷键 (`⌘E`)，你就可以在任何 macOS 应用程序中使用 AI 模型处理选中的文本。
+<p align="center">
+  <img src="Flick/Assets.xcassets/AppIcon.appiconset/icon-mac-512x512@2x.png" width="160" alt="Flick App Icon">
+</p>
 
-> 💡 **提示**: 非常适合作家、开发者、研究人员以及在 macOS 上处理文本的任何人！
+<p align="center">
+  一款原生、轻量的 macOS 菜单栏 AI 助手：划词处理、语音听写、AI 润色与跨应用文字插入。
+</p>
 
-## ✨ 核心功能概览
+<p align="center">
+  <img alt="Platform" src="https://img.shields.io/badge/platform-macOS%2015%2B-111111">
+  <img alt="Swift" src="https://img.shields.io/badge/Swift-native-B8FF00?labelColor=111111">
+  <img alt="Dependencies" src="https://img.shields.io/badge/dependencies-none-B8FF00?labelColor=111111">
+  <img alt="License" src="https://img.shields.io/badge/license-MIT-B8FF00?labelColor=111111">
+</p>
 
-### ⚡ 即时访问
-<img src="image-1.png" alt="alt text" style="max-height: 400px; width: auto;" />
-- **全局快捷键**: 在任何应用中按下 `⌘E` 即时处理选中文本
-- **极简界面**: 出现在光标位置的紧凑面板
+Flick 常驻在 macOS 菜单栏中。你可以在任意应用里选中文字，用全局快捷键呼出 AI 浮窗；也可以通过独立的听写快捷键录音，让 Flick 完成语音识别、文本润色，并把结果直接输入回原来的应用。
 
+项目使用 SwiftUI、AppKit、AVFoundation、Speech、Carbon、Core Graphics、Accessibility 与 Security 框架实现，不依赖任何第三方库。
 
-### 🤖 先进的 AI 能力
-<img src="image-2.png" alt="alt text" style="max-height: 400px; width: auto;" />
-- **通用模型支持**: 兼容任何 OpenAI 标准 API (GPT-4、DeepSeek、Claude 等)
-- **流式响应**: 实时观看 AI 回复内容，支持流式传输
-- **推理模式**: 开启"思考过程"展示，查看 AI 的推理步骤
-- **自动发现**: 自动从 API 端点获取可用模型列表
+> [!IMPORTANT]
+> Flick 需要你自行提供兼容的 API 服务与 API Key。API Key 只保存在当前用户的 macOS 钥匙串中，不会写入项目文件或打包进 App。
 
-### 🎨 直观设计
-<img src="image-4.png" alt="alt text" style="max-height: 400px; width: auto;" />
-- **简洁 UI**: macOS 原生磨砂玻璃效果，响应式设计
-- **智能布局**: 面板根据内容自动调整大小，优化屏幕使用
-- **Markdown 支持**: AI 回复支持基础 Markdown 格式渲染
-- **拖拽排序**: 使用直观的拖拽调整提示词顺序
+## 目录
 
-### 🔒 企业级安全
-<img src="image-3.png" alt="alt text" style="max-height: 400px; width: auto;" />
-- **安全存储**: API 密钥安全存储在 macOS 钥匙串中
-- **隐私优先**: 文本仅在你选择发送到 AI 服务时才离开本地
-- **无数据收集**: 你的使用数据永远不会离开你的电脑
+- [主要功能](#主要功能)
+- [工作方式](#工作方式)
+- [系统要求](#系统要求)
+- [安装](#安装)
+- [首次配置](#首次配置)
+- [使用划词功能](#使用划词功能)
+- [使用语音听写](#使用语音听写)
+- [快捷键](#快捷键)
+- [API 兼容性](#api-兼容性)
+- [Markdown 与思维链](#markdown-与思维链)
+- [权限说明](#权限说明)
+- [隐私与数据流](#隐私与数据流)
+- [从源码构建](#从源码构建)
+- [项目架构](#项目架构)
+- [配置持久化](#配置持久化)
+- [故障排查](#故障排查)
+- [发布 DMG](#发布-dmg)
+- [贡献](#贡献)
+- [许可证](#许可证)
 
-## 📦 安装
+## 主要功能
 
-### 快速安装 (推荐)
-1. 从 [Releases 页面](https://github.com/yourusername/flick/releases) 下载最新的 `.dmg` 文件
-2. 双击挂载磁盘镜像
-3. 将 `Flick.app` 拖拽到「应用程序」文件夹
-4. 运行应用，并根据提示授予辅助功能权限
+### 划词 AI 处理
 
-### 开发者安装
+- 在任意 macOS 应用中选中文字，通过全局快捷键呼出浮窗。
+- 默认提供解释、总结、翻译为中文、润色和续写提示词。
+- 支持创建、编辑、删除及拖拽排序自定义提示词。
+- 支持使用数字键 `1`–`9` 快速触发对应位置的提示词。
+- 支持直接输入一次性的自定义 Prompt。
+- 支持从收藏模型中快速切换当前模型。
+- 使用 Server-Sent Events 流式显示回复内容。
+- 可选显示模型返回的 reasoning 内容。
+- 回复支持 Markdown 排版与一键复制。
+
+### 语音听写
+
+- 支持创建多个独立的听写功能/配置档案。
+- 每个听写功能可以分别设置：
+  - 功能名称；
+  - 全局快捷键；
+  - 语音转写模型；
+  - 文本润色模型；
+  - 润色 System Prompt。
+- 普通组合键使用“按住录音、松开结束”的交互。
+- `Fn` 可作为独立快捷键，使用“按一次开始、再按一次结束”的交互。
+- 优先使用 Apple Speech 框架进行设备端中文识别。
+- 设备端识别不可用、失败或超时时，自动回退到远程转写接口。
+- 转写结果会通过选定的文本模型进行去口头禅、去重复、纠错和格式整理。
+- 可直接插入原应用，也可以先预览确认再插入。
+- 支持通过 Unicode 键盘事件输入中文、英文、Emoji 等字符。
+
+### 原生 macOS 体验
+
+- 菜单栏常驻，不显示普通 Dock 主窗口。
+- 全局快捷键动态注册，修改设置后自动重新加载。
+- 深色黑灰 + 荧光绿界面风格。
+- 划词浮窗会出现在鼠标附近，并根据内容调整尺寸。
+- 听写过程中显示录音、转写、润色、插入和错误状态浮层。
+- API Key 使用 Keychain Services 安全保存。
+- 无分析 SDK、无广告 SDK、无第三方依赖。
+
+## 工作方式
+
+### 划词处理流程
+
+```mermaid
+flowchart LR
+    A[在任意应用选中文字] --> B[触发划词快捷键]
+    B --> C[模拟 Command+C]
+    C --> D[读取并恢复剪贴板]
+    D --> E[显示提示词浮窗]
+    E --> F[调用 Chat Completions]
+    F --> G[流式解析正文与 reasoning]
+    G --> H[Markdown 渲染结果]
+```
+
+Flick 不使用 Accessibility API 直接读取文本内容，而是模拟 `⌘C`，轮询系统剪贴板获取新的字符串，并尽量恢复此前的纯文本剪贴板内容。
+
+### 听写流程
+
+```mermaid
+flowchart LR
+    A[按下听写快捷键] --> B[AVAudioEngine 采集音频]
+    B --> C{设备端 Speech 可用?}
+    C -->|是| D[Apple 本地中文识别]
+    C -->|否或失败| E[远程 audio/transcriptions]
+    D --> F[获得转写文本]
+    E --> F
+    F --> G[文本模型润色]
+    G --> H{启用插入前预览?}
+    H -->|是| I[预览并确认]
+    H -->|否| J[直接插入]
+    I --> J
+    J --> K[CGEvent Unicode 输入到原应用]
+```
+
+录音会同时转换并保存为 16 kHz、单声道、16-bit PCM WAV 临时文件。任务结束后，临时音频文件会被删除。
+
+## 系统要求
+
+- macOS 15.0 或更高版本。
+- 推荐 Apple Silicon Mac。
+- 麦克风（使用听写功能时）。
+- 可访问所配置 API 服务的网络环境。
+- 一个兼容的 API Key。
+
+开发环境：
+
+- 推荐使用项目当前版本对应的 Xcode 26 或更新版本。
+- Swift 编译设置由 Xcode 工程管理。
+- 不需要 CocoaPods、Carthage 或 Swift Package Manager 依赖。
+
+## 安装
+
+### 从 DMG 安装
+
+1. 从 GitHub Releases 下载最新的 `Flick-<version>.dmg`。
+2. 双击 DMG。
+3. 将 `Flick.app` 拖入 `Applications`。
+4. 启动 Flick。
+5. 根据 macOS 提示授予辅助功能、麦克风和语音识别权限。
+
+如果下载的是未经 Apple Developer ID 公证的测试版本，macOS 可能会阻止首次启动。你可以在 Finder 中右键 Flick，选择“打开”，然后再次确认。正式公开发布时建议使用 Developer ID 签名并完成 Apple Notary 公证。
+
+### 从源码运行
+
 ```bash
-git clone https://github.com/yourusername/flick.git
-cd flick
-open Flick.xcodeproj  # 在 Xcode 中构建并运行
+git clone https://github.com/think2do/Flick.git
+cd Flick
+open Flick.xcodeproj
 ```
 
-### 系统要求
-- **macOS**: 15.0 或更新版本
-- **权限需求**: 辅助功能权限 (读取选中文本) 和输入监控权限 (全局快捷键)
+在 Xcode 中选择 `Flick` Scheme 和 `My Mac`，然后按 `⌘R`。
 
-## 🚀 快速开始
+## 首次配置
 
-### 1. 首次配置
+Flick 启动后只显示菜单栏闪电图标。点击图标并选择“设置…”。
 
-当你首次启动 Flick 时：
+### 通用
 
-1. **授予权限**：
-   - 点击 "打开辅助功能设置" 启用文本选择读取
-   - 在系统设置 → 隐私与安全性 → 辅助功能中启用辅助功能权限
-   - 在输入监控中启用 Flick 应用
+填写：
 
-2. **配置 AI 服务**：
-   - 点击菜单栏图标 → 设置
-   - 输入你的 API 基础 URL (例如 `https://api.openai.com/v1`)
-   - 添加你的 API 密钥 (安全存储在钥匙串中)
-   - 点击 "刷新模型" 获取可用模型列表
+- **API Key**：用于调用你选择的 API 服务；
+- **API Base URL**：兼容 OpenAI 风格的 API 根地址。
 
-### 2. 你的第一次 AI 请求
-1. 在任何应用程序中选择文本
-2. 按下 `⌘E` (Command + E)
-3. 从浮动面板中选择预设提示词
-4. 立即观看 AI 处理你的文本！
+随后点击“测试连接”。Flick 会调用 `<Base URL>/models` 检查地址与鉴权是否可用。
 
-### 3. 自定义体验
-- **添加自定义提示词**: 设置 → 提示词 → 添加新提示词
-- **使用占位符**: 在选中文本应该出现的位置插入 `{{text}}`
-- **重新排序**: 拖拽提示词调整顺序
-- **快速访问**: 按下数字键 1-9 按位置选择提示词
+如果使用 OpenRouter，通用页面还会尝试读取 `<Base URL>/credits` 并显示账户余额。其他服务不会查询余额。
 
-## 🎯 内置提示词
+### 划词
 
-Flick 默认包含以下有用的预设提示词：
+1. 从模型库获取服务端模型列表。
+2. 添加常用模型。
+3. 点击模型行，将其设为当前划词模型。
+4. 录制划词快捷键。
+5. 根据需要编辑或新增提示词。
 
-| 图标 | 提示词 | 描述 |
-|------|--------|------|
-| 📖 | 解释 | 提供清晰的解释和定义 |
-| 📝 | 总结 | 提取关键要点，创建简洁总结 |
-| 🌐 | 翻译为中文 | 将文本翻译为中文 |
-| ✏️ | 润色 | 提高清晰度、流畅性和专业性 |
-| 💡 | 续写 | 按照相同风格生成延续内容 |
-| 🧠 | 深度分析 | 详细分析，包含逐步推理 |
-| 🔄 | 改写 | 用不同方式表达相同意思 |
+自定义提示词中可以使用 `{{text}}` 表示当前选中的文本。例如：
 
-> 💡 **专业技巧**: 创建常用提示词来构建你的个性化 AI 工具箱！
+```text
+请将下面内容翻译成简洁自然的英文，只输出翻译结果：
 
-## 🔌 API 配置
-
-### 兼容的服务
-Flick 可与任何提供 OpenAI 兼容 API 的服务配合使用：
-
-| 服务 | 基础 URL |
-|------|---------|
-| **OpenAI** | `https://api.openai.com/v1` |
-| **DeepSeek** | `https://api.deepseek.com` |
-| **Azure OpenAI** | `https://{your-resource}.openai.azure.com/openai/deployments/{deployment-name}` |
-| **本地模型** | `http://localhost:8080/v1` |
-| **Ollama** | `http://localhost:11434/v1` (需安装 OpenAI 兼容插件) |
-| **LM Studio** | `http://localhost:1234/v1` |
-
-### 高级配置
-```
-# 针对具有不同认证方式的本地模型服务器：
-API 基础 URL: http://localhost:8000
-自定义请求头: {"Authorization": "Bearer custom-token"}
-启用/禁用流式传输: ✓
-请求超时时间: 30秒 (可调整)
+{{text}}
 ```
 
-## 🛠️ 技术细节
+当提示词不包含 `{{text}}` 时，提示词内容会作为 system message，选中文本会作为 user message。
 
-### 架构概览
+### 听写
+
+点击“添加听写功能”，为不同场景创建独立配置，例如：
+
+- 日常聊天；
+- 工作邮件；
+- 会议记录；
+- 编程术语；
+- 中英混合输入。
+
+每个配置需要填写转写模型和润色模型。当前远程转写实现默认使用类似 `openai/whisper-large-v3` 的模型 ID，具体可用模型取决于你的 API 提供商。
+
+## 使用划词功能
+
+默认快捷键为 `⌘E`。
+
+1. 在备忘录、浏览器、编辑器或其他应用中选中文字。
+2. 按 `⌘E`。
+3. 在鼠标附近出现的浮窗中选择提示词。
+4. 等待流式结果。
+5. 点击“复制”，或返回选择其他提示词。
+
+提示词列表支持：
+
+- 鼠标点击；
+- 数字键 `1`–`9`；
+- 自定义 Prompt 输入框；
+- 收藏模型切换；
+- reasoning 开关；
+- 点击浮窗外区域自动关闭。
+
+## 使用语音听写
+
+### 普通组合键
+
+如果听写配置使用 `⌘⇧D` 等普通组合键：
+
+1. 将光标放在目标应用的输入位置。
+2. 按住快捷键并说话。
+3. 松开快捷键结束录音。
+4. Flick 完成识别与润色。
+5. 结果会预览或直接输入回刚才的应用。
+
+### Fn 模式
+
+如果将听写配置设置为单独的 `Fn`：
+
+1. 按一次 `Fn` 开始录音。
+2. 再按一次 `Fn` 结束录音。
+3. 等待转写、润色和插入。
+
+Flick 使用全局 `flagsChanged` Event Tap 识别 Fn 状态。配置 Fn 后，Flick 会拦截相应 Fn 状态变化，以避免同时触发 Globe/Emoji 等系统行为。
+
+> [!NOTE]
+> 当前设备端 Speech locale 固定为 `zh-CN`。专业术语、口音或其他语言识别不理想时，可由远程转写模型回退处理。
+
+## 快捷键
+
+| 功能 | 默认值 | 行为 |
+| --- | --- | --- |
+| 划词 | `⌘E` | 按下后读取选中文本并显示浮窗 |
+| 听写 | `⌘⇧D` | 按住开始录音，松开结束 |
+| Fn 听写 | 用户自定义 | 按一次开始，再按一次结束 |
+
+快捷键录制器支持：
+
+- `⌘`、`⌥`、`⌃`、`⇧` 与普通按键组合；
+- 方向键、空格、回车、Tab、Delete、Home、End、Page Up/Down；
+- `F1`–`F12`；
+- 单独的 `Fn`。
+
+划词和听写配置不能使用完全相同的快捷键。多个听写配置之间也会检查冲突。
+
+## API 兼容性
+
+Flick 面向 OpenAI 风格的 HTTP API，但并不意味着所有“兼容服务”的每一个扩展端点都完全相同。
+
+### 必需端点
+
+#### 获取模型
+
+```http
+GET /v1/models
+Authorization: Bearer <API_KEY>
 ```
-Flick.app (菜单栏应用)
-├── AppDelegate (应用生命周期和设置)
-├── GlobalHotkeyManager (⌘E 快捷键注册)
-├── SelectionReader (通过模拟 ⌘C 提取文本)
-├── AIService (支持流式传输的 API 通信)
-├── FloatingPanelController (可调整大小的浮动 UI)
-├── SettingsManager (配置持久化存储)
-└── KeychainHelper (安全的凭据存储)
+
+模型列表应返回：
+
+```json
+{
+  "data": [
+    { "id": "provider/model-name" }
+  ]
+}
 ```
 
-### 技术栈
-- **编程语言**: Swift 5.9+
-- **UI 框架**: SwiftUI & AppKit
-- **目标平台**: macOS 15.0+
-- **构建系统**: Xcode 15+
-- **无外部依赖**: 纯原生 macOS 实现
+#### 流式文本处理
 
-### 安全与隐私
-- **API 密钥**: 仅存储在 macOS 钥匙串中
-- **文本处理**: 未经用户明确操作，选中文本不会离开你的系统
-- **网络通信**: 所有 API 通信都使用带有标准加密的 HTTPS
-- **本地存储**: 设置存储在 UserDefaults 中 (每个应用沙箱隔离)
+```http
+POST /v1/chat/completions
+Authorization: Bearer <API_KEY>
+Content-Type: application/json
+```
 
-## 🤔 常见问题
+请求包含：
 
-### Q: 为什么 Flick 需要辅助功能权限？
-**A**: macOS 安全机制要求应用程序必须具备辅助功能权限才能从其他应用中读取文本。Flick 使用这些权限来模拟 `⌘C` 并获取你选中的文本。
+- `model`；
+- `stream: true`；
+- `messages`；
+- `include_reasoning`；
+- 可选的 `reasoning.effort`。
 
-### Q: 我可以使用免费的 AI 模型吗？
-**A**: 当然可以！Flick 兼容任何 OpenAI 标准 API，包括免费和本地模型：
-- [Ollama](https://ollama.ai/) (本地 LLM)
-- [LM Studio](https://lmstudio.ai/) (本地图形界面)
-- [OpenRouter](https://openrouter.ai/) (聚合模型)
-- 许多自托管解决方案
+响应需要使用 SSE，并通过 `data: {...}` 返回 `choices[0].delta.content`。如果服务支持 reasoning，Flick 还会读取 `choices[0].delta.reasoning`。
 
-### Q: 如何排查连接问题？
-1. 验证你的 API 基础 URL 是否正确
-2. 检查你的 API 密钥是否有效且有足够额度
-3. 确保服务支持 `/chat/completions` 端点并启用流式传输
-4. 暂时禁用任何 VPN 或防火墙
-5. 检查 macOS 防火墙设置：系统设置 → 网络 → 防火墙
+### 远程语音转写端点
 
-### Q: 我可以使用自定义快捷键吗？
-**A**: 目前 Flick 使用 `⌘E` 作为默认快捷键。支持自定义快捷键的计划将在未来版本中实现。
+```http
+POST /v1/audio/transcriptions
+Authorization: Bearer <API_KEY>
+Content-Type: application/json
+```
 
-### Q: 我的文本数据会被发送到其他地方吗？
-**A**: **不会**。你的选中文本仅发送到你明确配置的 AI 服务。应用本身没有任何分析、遥测或外部数据收集。
+当前实现发送 JSON：
 
-## 👥 贡献指南
+```json
+{
+  "model": "openai/whisper-large-v3",
+  "input_audio": {
+    "data": "<BASE64_WAV>",
+    "format": "wav"
+  }
+}
+```
 
-我们欢迎各种贡献！以下是你提供帮助的方式：
+响应需要包含：
 
-1. **报告问题**: [打开错误报告](https://github.com/yourusername/flick/issues)
-2. **建议功能**: [分享你的想法](https://github.com/yourusername/flick/issues/new?labels=enhancement)
-3. **提交代码**:
-   ```bash
-   git clone https://github.com/yourusername/flick.git
-   cd flick
-   git checkout -b feature/你的功能名称
-   # 修改代码，然后创建 Pull Request
-   ```
+```json
+{
+  "text": "转写结果"
+}
+```
 
-### 开发环境设置
+部分 OpenAI 兼容服务只接受 `multipart/form-data`，不接受上述 JSON 音频格式；这种情况下远程听写会返回 HTTP 400，需要针对该服务调整 `TranscriptionService`。
+
+### Base URL 规则
+
+Flick 会去除 Base URL 末尾的 `/`，并在地址不是以 `/v1` 结尾时自动补上 `/v1`。
+
+常见示例：
+
+| 服务类型 | Base URL 示例 | 说明 |
+| --- | --- | --- |
+| OpenAI | `https://api.openai.com/v1` | 文本端点兼容；转写模型与请求格式需自行确认 |
+| OpenRouter | `https://openrouter.ai/api/v1` | 支持模型列表、文本模型与余额查询；音频端点能力以账户和模型为准 |
+| 本地兼容服务 | `http://localhost:1234/v1` | API Key 可根据服务要求填写占位值 |
+
+网络请求使用系统 `URLSession`，会遵循 macOS 的网络和代理设置。请求超时默认为 30 秒，资源总超时为 180 秒；远程转写请求超时为 120 秒。
+
+## Markdown 与思维链
+
+划词结果浮窗支持：
+
+- 一级到六级标题；
+- 段落；
+- 粗体、斜体、删除线、行内代码及链接；
+- 有序列表和无序列表；
+- 引用；
+- 分隔线；
+- 带语言标签的围栏代码块；
+- 代码块横向滚动；
+- 流式输出时尚未闭合的代码块。
+
+reasoning 开启后，Flick 会向服务发送相关参数，并读取响应中的 `delta.reasoning`。并非所有模型或 API 服务都支持该字段；不支持时通常只会显示最终正文。
+
+“思维链”或 reasoning 内容由上游模型/API 决定。请不要假设它一定代表模型真实、完整或可靠的内部推理过程。
+
+## 权限说明
+
+Flick 会使用以下系统权限：
+
+### 辅助功能
+
+用途：
+
+- 模拟 `⌘C` 获取选中文本；
+- 使用 CGEvent 将听写结果输入到其他应用；
+- 监听单独的 Fn 键。
+
+路径：
+
+`系统设置 → 隐私与安全性 → 辅助功能`
+
+授权后建议完全退出并重新启动 Flick。
+
+### 麦克风
+
+用途：通过 AVAudioEngine 采集语音。
+
+路径：
+
+`系统设置 → 隐私与安全性 → 麦克风`
+
+### 语音识别
+
+用途：通过 Apple Speech 框架尝试设备端语音识别。
+
+路径：
+
+`系统设置 → 隐私与安全性 → 语音识别`
+
+不同 macOS 版本或系统策略下，还可能显示输入监控相关提示。
+
+## 隐私与数据流
+
+### 本地保存的数据
+
+| 数据 | 保存位置 |
+| --- | --- |
+| API Key | macOS Keychain，service 为 `com.hyx.ai-assistant` |
+| API Base URL | UserDefaults |
+| 模型选择与收藏 | UserDefaults |
+| 自定义提示词 | UserDefaults（JSON 编码） |
+| 快捷键配置 | UserDefaults（JSON 编码） |
+| 听写配置与预览选项 | UserDefaults（JSON 编码） |
+
+### 会发送到 API 服务的数据
+
+- 使用划词功能时：选中的文本、提示词、模型名称与 reasoning 设置。
+- 使用听写功能时：
+  - 如果设备端识别成功，不上传原始音频；
+  - 如果设备端识别不可用或失败，WAV 音频会以 Base64 发送到你配置的转写端点；
+  - 无论转写来自本地还是远程，转写文本都会发送给你选择的文本模型进行润色。
+
+Flick 当前代码中没有分析、遥测、广告或自有数据上传服务。数据如何被保存和使用，仍取决于你配置的 API 提供商，请阅读对应服务的隐私政策。
+
+### 临时数据
+
+- 录音期间创建临时 WAV 文件；
+- 完成或失败后自动尝试删除；
+- 划词时临时读取系统剪贴板，并恢复此前的纯文本内容。
+
+> [!WARNING]
+> 剪贴板恢复逻辑目前只保存和恢复纯文本。如果原剪贴板包含图片、富文本或文件等其他类型，模拟复制可能改变这些内容。
+
+## 从源码构建
+
+### Xcode
+
 ```bash
-# 1. 克隆并在 Xcode 中打开
-git clone https://github.com/yourusername/flick.git
-open flick.xcodeproj
-
-# 2. 构建并运行
-# 选择 "Flick" scheme
-# 点击运行 (⌘R)
+git clone https://github.com/think2do/Flick.git
+cd Flick
+open Flick.xcodeproj
 ```
 
-### 代码风格
-- 使用 Swift 的现代并发特性 (`async/await`)
-- 遵循 Apple 的 Swift API 设计指南
-- 为公共 API 包含适当的文档
-- 尽可能为新功能编写单元测试
+然后：
 
-## 📈 开发路线图
+1. 选择 Flick Target。
+2. 打开 `Signing & Capabilities`。
+3. 选择你自己的 Development Team。
+4. 如有需要，将 Bundle Identifier 改成你自己的唯一标识。
+5. 选择 `My Mac` 并运行。
 
-### 计划中的功能
-- [ ] 可自定义的全局快捷键
-- [ ] 高级 Markdown 渲染与语法高亮
-- [ ] 图像输入支持 (截图转文本)
+### 命令行 Debug 构建
 
-
-
-## 📞 支持与社区
-
-### 获取帮助
-1. **查看上面的 [常见问题](#-常见问题)** 寻找常见解决方案
-2. **搜索现有的 [Issues](https://github.com/yourusername/flick/issues)** 寻找类似问题
-3. **如果找不到答案，请打开新的 Issue**
-
-### 报告问题时请包含
-- Flick 版本 (可在设置 → 关于中查看)
-- macOS 版本
-- 你的 API 配置 (服务类型、选择的模型)
-- 重现问题的步骤
-- 任何相关的错误信息
-
-### 与我们联系
-- 🐛 [Issues](https://github.com/yourusername/flick/issues) - 报告错误或请求功能
-- ⭐ **给项目加星** - 支持我们的工作！
-
-## 📄 许可证
-
-Flick 采用 MIT 许可证发布。详见 [LICENSE](LICENSE) 文件。
-
-```
-MIT 许可证
-
-版权所有 (c) 2024 你的名字
-
-特此免费授予任何获得本软件副本...
+```bash
+xcodebuild \
+  -project Flick.xcodeproj \
+  -scheme Flick \
+  -configuration Debug \
+  -derivedDataPath /tmp/FlickDerivedData \
+  build
 ```
 
-## 🙏 致谢
+### 不签名的 Release 构建
 
-- 使用 ❤️ Swift 和 SwiftUI 构建
-- 图标来自 [Lucide](https://lucide.dev/)
-- 灵感来自生产力工具社区
-- 感谢所有贡献者和测试者！
+```bash
+xcodebuild \
+  -project Flick.xcodeproj \
+  -scheme Flick \
+  -configuration Release \
+  -derivedDataPath /tmp/FlickReleaseDerivedData \
+  CODE_SIGNING_ALLOWED=NO \
+  build
+```
 
----
+构建结果通常位于：
 
-**祝你使用愉快！** ✨
+```text
+/tmp/FlickReleaseDerivedData/Build/Products/Release/Flick.app
+```
 
-无论你是编写文档、翻译内容、头脑风暴，还是仅仅探索 AI 能力，Flick 都旨在让 AI 助手变得轻松且融入你的日常工作流。尝试一下，体验在所有 macOS 应用程序中无缝处理文本！
+## 项目架构
 
----
+```text
+Flick/
+├── Flick.xcodeproj/
+├── Flick/
+│   ├── FlickApp.swift
+│   ├── ContentView.swift
+│   ├── AppDelegate.swift
+│   ├── GlobalHotkeyManager.swift
+│   ├── SelectionReader.swift
+│   ├── AIService.swift
+│   ├── FloatingPanelController.swift
+│   ├── PresetPromptView.swift
+│   ├── SettingsManager.swift
+│   ├── SettingsView.swift
+│   ├── KeychainHelper.swift
+│   ├── VoiceDictation/
+│   │   ├── AudioRecorder.swift
+│   │   ├── LocalSpeechTranscriber.swift
+│   │   ├── TranscriptionService.swift
+│   │   ├── VoiceDictationCoordinator.swift
+│   │   ├── VoiceStatusOverlay.swift
+│   │   └── TextInjector.swift
+│   ├── Assets.xcassets/
+│   ├── Info.plist
+│   └── Flick.entitlements
+├── README.md
+└── LICENSE
+```
 
-*注：Flick 是一个独立项目，与 OpenAI、DeepSeek 或其他任何 AI 服务提供商无关。请确保你始终遵守所使用的 AI 提供商的服务条款。*
+### 核心文件职责
+
+| 文件 | 职责 |
+| --- | --- |
+| `FlickApp.swift` | SwiftUI 应用入口；应用以菜单栏模式运行 |
+| `ContentView.swift` | Xcode 模板保留视图；当前菜单栏主流程未使用，可按需删除或改作未来主界面 |
+| `AppDelegate.swift` | 生命周期、菜单栏、设置窗口、热键和主要协调器装配 |
+| `GlobalHotkeyManager.swift` | Carbon 多热键注册，以及 Fn Event Tap |
+| `SelectionReader.swift` | 模拟复制、读取并恢复剪贴板 |
+| `AIService.swift` | 鉴权请求、模型列表、余额查询、SSE 流式 Chat Completions |
+| `FloatingPanelController.swift` | 创建、定位、缩放和关闭划词 NSPanel |
+| `PresetPromptView.swift` | 提示词菜单、模型切换、reasoning、Markdown 结果视图 |
+| `SettingsManager.swift` | 全局配置模型、默认值、迁移和持久化 |
+| `SettingsView.swift` | 通用、划词、听写设置界面及编辑弹窗 |
+| `KeychainHelper.swift` | API Key 的 Keychain 增删改查 |
+| `AudioRecorder.swift` | AVAudioEngine 录音、PCM 转换和 WAV 写入 |
+| `LocalSpeechTranscriber.swift` | Apple Speech 设备端识别与超时控制 |
+| `TranscriptionService.swift` | 远程音频转写请求与错误解析 |
+| `VoiceDictationCoordinator.swift` | 听写状态机与录音、识别、润色、预览、插入流程编排 |
+| `VoiceStatusOverlay.swift` | 听写状态、错误和结果预览浮层 |
+| `TextInjector.swift` | Accessibility 检查及 Unicode CGEvent 输入 |
+
+## 配置持久化
+
+`SettingsManager` 是共享的 `ObservableObject`。除 API Key 外，配置保存在 `UserDefaults.standard` 中。
+
+为了兼容旧版本，听写配置初始化时会尝试读取旧的单热键、转写模型和润色模型字段，并迁移为新的 `VoiceDictationProfile` 数组。
+
+API Base URL 默认值：
+
+```text
+https://api.openai.com/v1
+```
+
+默认划词模型：
+
+```text
+gpt-4o
+```
+
+默认远程转写模型：
+
+```text
+openai/whisper-large-v3
+```
+
+这些只是初始值，是否可用取决于实际 API 提供商。
+
+## 故障排查
+
+### 菜单栏没有出现 Flick
+
+- 确认 App 仍在运行。
+- Flick 是 `LSUIElement` 菜单栏应用，不会显示普通主窗口或 Dock 图标。
+- 在活动监视器中结束旧实例后重新启动。
+
+### 快捷键没有响应
+
+- 检查系统辅助功能权限。
+- 修改权限后完全退出并重新启动 Flick。
+- 确认快捷键没有被其他应用或系统功能占用。
+- 如果使用 Fn，检查 Globe/Emoji 系统配置及控制台中的 Event Tap 错误。
+
+### 划词浮窗没有出现
+
+- 确保当前应用允许复制选中文本。
+- 手动按 `⌘C`，确认剪贴板中确实出现文本。
+- 密码框、安全输入区域和部分受保护应用可能拒绝模拟复制。
+- Flick 只处理非空字符串。
+
+### API 测试失败
+
+- 确认 API Key 已填写；Keychain 中没有凭据时需要重新输入。
+- 确认 Base URL 能形成有效的 `/v1/models` 地址。
+- 检查代理、VPN、防火墙和 DNS。
+- 检查服务是否接受 `Authorization: Bearer <key>`。
+- 在设置页面查看测试连接返回的具体错误。
+
+### HTTP 400
+
+常见原因：
+
+- 模型 ID 不存在或当前账户无权使用；
+- 服务不支持 `include_reasoning` 或 `reasoning` 参数；
+- 远程转写端点要求 multipart，而不是 Base64 JSON；
+- 音频模型不支持 `input_audio` 请求格式；
+- Base URL 指向了错误的兼容层。
+
+### 听写失败
+
+- 检查麦克风和语音识别权限。
+- 确认系统存在可用输入设备。
+- 检查 API Key，因为即使本地转写成功，润色步骤仍需要文本 API。
+- 检查听写配置中的转写模型和润色模型。
+- 如果本地识别质量不佳，确认远程转写端点可用。
+
+### 文字没有插入目标应用
+
+- 授予辅助功能权限。
+- 确认触发听写时目标应用位于前台。
+- 某些安全输入框、远程桌面或游戏可能阻止合成键盘事件。
+- 开启“插入前预览”，确认前面的转写和润色阶段是否成功。
+
+### OpenRouter 余额无法显示
+
+- 余额查询只在 Base URL 包含 `openrouter.ai` 时启用。
+- API Key 必须能访问 `/credits`。
+- 余额失败不会阻止文本和听写功能。
+
+## 发布 DMG
+
+下面是一个最小的本地测试包流程。正式公开分发时请使用 Developer ID 签名和 Apple Notary 公证。
+
+```bash
+# 1. 构建 Release
+xcodebuild \
+  -project Flick.xcodeproj \
+  -scheme Flick \
+  -configuration Release \
+  -derivedDataPath /tmp/FlickReleaseDerivedData \
+  CODE_SIGNING_ALLOWED=NO \
+  build
+
+# 2. 准备 DMG 目录
+STAGE="$(mktemp -d /tmp/FlickDMG.XXXXXX)"
+ditto \
+  /tmp/FlickReleaseDerivedData/Build/Products/Release/Flick.app \
+  "$STAGE/Flick.app"
+ln -s /Applications "$STAGE/Applications"
+
+# 3. 仅供本地测试的 ad-hoc 签名
+codesign --force --deep --sign - \
+  --entitlements Flick/Flick.entitlements \
+  "$STAGE/Flick.app"
+
+# 4. 创建 DMG
+hdiutil create \
+  -volname "Flick" \
+  -srcfolder "$STAGE" \
+  -format UDZO \
+  -ov \
+  "Flick-0.2.dmg"
+
+# 5. 校验
+hdiutil verify "Flick-0.2.dmg"
+shasum -a 256 "Flick-0.2.dmg"
+```
+
+> [!CAUTION]
+> Ad-hoc 签名的 DMG 可能被 Gatekeeper 警告，不适合面向公众发布。正式发布需要 Apple Developer Program、`Developer ID Application` 证书、Hardened Runtime、`notarytool` 和 `stapler`。
+
+## 已知限制
+
+- 当前设备端语音识别 locale 固定为 `zh-CN`。
+- 当前远程转写请求使用 Base64 JSON，而不是通用的 multipart 上传格式。
+- 选中文本读取依赖模拟复制，不适用于所有安全输入场景。
+- 剪贴板只恢复此前的纯文本内容。
+- 文本插入使用逐字符 CGEvent，在特别长的文本上可能需要一定时间。
+- reasoning、模型列表、余额和音频端点属于提供商能力，不是所有 OpenAI 兼容服务都支持。
+- 项目当前没有自动化测试 Target。
+
+## 贡献
+
+欢迎提交 Issue 和 Pull Request。
+
+建议流程：
+
+1. Fork 仓库。
+2. 从主分支创建功能分支。
+3. 保持模块职责清晰，优先使用原生 macOS API。
+4. 不要提交 API Key、证书、Provisioning Profile、`.env` 或个人 Xcode 用户数据。
+5. 在至少一个真实的 macOS 输入应用中验证快捷键和文字插入。
+6. 提交 Pull Request，并描述测试环境、复现步骤和验证结果。
+
+提交问题时，请提供：
+
+- macOS 版本与 Mac 芯片；
+- Flick 版本；
+- API 服务类型和模型 ID（不要提供 API Key）；
+- 使用的是划词、普通听写快捷键还是 Fn；
+- 完整错误信息；
+- 可复现步骤。
+
+## 安全提醒
+
+- 不要把 API Key 写进源码、README、Issue、截图或 Git 历史。
+- 不要提交 `.p12`、证书、Provisioning Profile 或带密码的配置文件。
+- 如果 API Key 曾经进入 Git 历史，仅删除文件并不够，应立即在提供商后台撤销并重新生成。
+- 发布前检查 Xcode 工程中的 Development Team、Bundle Identifier 和签名配置是否适合公开仓库。
+
+## 许可证
+
+Flick 使用 [MIT License](LICENSE)。
+
+Copyright (c) 2025 HYX Project.
+
+## 免责声明
+
+Flick 与 OpenAI、OpenRouter、Apple 或其他模型/API 提供商不存在隶属或背书关系。模型输出可能不准确，发送敏感文本或音频前请确认所用 API 服务的隐私政策、数据保留规则和适用条款。

@@ -29,7 +29,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupStatusBar() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "sparkles", accessibilityDescription: "Flick")
+            let image = NSImage(systemSymbolName: "bolt.fill", accessibilityDescription: "Flick")
+            image?.isTemplate = true
+            button.image = image
         }
 
         let menu = NSMenu()

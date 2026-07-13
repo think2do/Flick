@@ -5,6 +5,13 @@
 
 import SwiftUI
 
+private enum FloatingStyle {
+    static let accent = Color(red: 0.72, green: 1.0, blue: 0.0)
+    static let canvas = Color(red: 0.035, green: 0.039, blue: 0.037)
+    static let panel = Color(red: 0.075, green: 0.082, blue: 0.078)
+    static let border = Color.white.opacity(0.1)
+}
+
 struct PresetPromptView: View {
     let selectedText: String
     @ObservedObject var aiService: AIService
@@ -28,21 +35,7 @@ struct PresetPromptView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 8) {
-                Spacer(minLength: 8)
-
-                modelSwitcher
-
-                Button(action: {
-                    settings.enableReasoning.toggle()
-                }) {
-                    Image(systemName: "brain")
-                        .font(.caption)
-                        .foregroundStyle(settings.enableReasoning ? .orange : .secondary.opacity(0.7))
-                }
-                .buttonStyle(.plain)
-                .help(settings.enableReasoning ? "推理已开启" : "推理已关闭")
-            }
+            topToolbar
             .padding(.horizontal, 12)
             .padding(.top, 8)
             .padding(.bottom, 6)
@@ -55,12 +48,85 @@ struct PresetPromptView: View {
                 responseView
             }
         }
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .background(FloatingStyle.canvas)
+        .tint(FloatingStyle.accent)
+        .preferredColorScheme(.dark)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(.quaternary, lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(FloatingStyle.border, lineWidth: 1)
         )
+    }
+
+    private var isShowingResponse: Bool { activePrompt != nil || isCustomMode }
+
+    private var topToolbar: some View {
+        ZStack {
+            if isShowingResponse {
+                Group {
+                    if let prompt = activePrompt {
+                        Label(prompt.title, systemImage: prompt.icon)
+                    } else {
+                        Label("自定义", systemImage: "text.cursor")
+                    }
+                }
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(FloatingStyle.accent)
+                .lineLimit(1)
+            } else {
+                modelSwitcher
+            }
+
+            HStack(spacing: 8) {
+                if isShowingResponse {
+                    Button(action: returnToPromptList) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.left")
+                            Text("返回")
+                        }
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.78))
+                        .frame(height: 26)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Spacer()
+
+                Button(action: { settings.enableReasoning.toggle() }) {
+                    Image(systemName: "brain.head.profile.fill")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(settings.enableReasoning ? .black : Color.white.opacity(0.48))
+                        .frame(width: 26, height: 26)
+                        .background(
+                            settings.enableReasoning ? FloatingStyle.accent : Color.white.opacity(0.06),
+                            in: Circle()
+                        )
+                        .overlay { Circle().stroke(FloatingStyle.border, lineWidth: 0.7) }
+                }
+                .buttonStyle(.plain)
+                .help(settings.enableReasoning ? "推理已开启" : "推理已关闭")
+
+                Button(action: onClose) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(Color.white.opacity(0.48))
+                        .frame(width: 26, height: 26)
+                        .background(Color.white.opacity(0.06), in: Circle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .frame(height: 28)
+    }
+
+    private func returnToPromptList() {
+        aiService.cancel()
+        activePrompt = nil
+        isCustomMode = false
+        let listHeight = CGFloat(50 + prompts.count * 38 + 64)
+        onResize(NSSize(width: 320, height: min(listHeight, 360)))
     }
 
     // MARK: - Compact Prompt List
@@ -74,30 +140,13 @@ struct PresetPromptView: View {
         } else {
             aiService.sendRequest(systemPrompt: promptText, userContent: selectedText)
         }
-        onResize(NSSize(width: 380, height: 360))
+        onResize(NSSize(width: 400, height: 380))
     }
 
     private var promptList: some View {
         VStack(spacing: 0) {
             ForEach(Array(prompts.enumerated()), id: \.element.id) { index, prompt in
-                Button(action: { triggerPrompt(prompt) }) {
-                    HStack(spacing: 8) {
-                        Text("\(index + 1)")
-                            .font(.caption2.monospaced())
-                            .foregroundStyle(.tertiary)
-                            .frame(width: 14)
-                        Image(systemName: prompt.icon)
-                            .font(.caption)
-                            .frame(width: 16)
-                        Text(prompt.title)
-                            .font(.callout)
-                        Spacer()
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 7)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
+                FloatingPromptButton(index: index + 1, prompt: prompt) { triggerPrompt(prompt) }
             }
 
             Divider()
@@ -112,14 +161,16 @@ struct PresetPromptView: View {
                 Button(action: sendCustomPrompt) {
                     Image(systemName: "paperplane.fill")
                         .font(.caption)
-                        .foregroundColor(customInput.isEmpty ? .gray : .accentColor)
+                        .foregroundColor(customInput.isEmpty ? .gray : FloatingStyle.accent)
                 }
                 .buttonStyle(.plain)
                 .disabled(customInput.isEmpty)
             }
             .padding(.horizontal, 12)
             .padding(.top, 6)
-                .padding(.bottom, 6)
+            .padding(.bottom, 8)
+            .background(FloatingStyle.panel, in: RoundedRectangle(cornerRadius: 10))
+            .padding(.horizontal, 8)
         }
         .padding(.vertical, 4)
         .onAppear {
@@ -133,7 +184,7 @@ struct PresetPromptView: View {
         isCustomMode = true
         let userMessage = customInput + "\n\n" + selectedText
         aiService.sendRequest(systemPrompt: "", userContent: userMessage)
-        onResize(NSSize(width: 380, height: 360))
+        onResize(NSSize(width: 400, height: 380))
     }
 
     @State private var keyMonitor: Any?
@@ -163,37 +214,6 @@ struct PresetPromptView: View {
 
     private var responseView: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Button(action: {
-                    aiService.cancel()
-                    activePrompt = nil
-                    isCustomMode = false
-                    let listHeight = CGFloat(32 + prompts.count * 30 + 8 + 54)
-                    onResize(NSSize(width: 280, height: listHeight))
-                }) {
-                    HStack(spacing: 3) {
-                        Image(systemName: "chevron.left")
-                        Text("返回")
-                    }
-                    .font(.caption)
-                }
-                .buttonStyle(.plain)
-
-                Spacer()
-
-                if let prompt = activePrompt {
-                    Label(prompt.title, systemImage: prompt.icon)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else if isCustomMode {
-                    Label("自定义", systemImage: "text.cursor")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.top, 8)
-
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 8) {
@@ -268,7 +288,7 @@ struct PresetPromptView: View {
                         .controlSize(.mini)
                     Text("思考中...")
                         .font(.caption)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(FloatingStyle.accent)
                 }
 
                 Text(aiService.reasoningText)
@@ -285,13 +305,14 @@ struct PresetPromptView: View {
                 } label: {
                     Text("思考过程")
                         .font(.caption)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(FloatingStyle.accent)
                 }
             }
         }
         .padding(8)
-        .background(Color.orange.opacity(0.06))
-        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .background(FloatingStyle.accent.opacity(0.07))
+        .overlay { RoundedRectangle(cornerRadius: 10).stroke(FloatingStyle.accent.opacity(0.18)) }
+        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 
     // MARK: - Markdown Rendering
@@ -323,18 +344,234 @@ struct PresetPromptView: View {
     private func modelChip(_ model: String) -> some View {
         Text(displayModelName(model))
         .font(.caption2)
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 6)
-        .padding(.vertical, 3)
-        .background(Color.secondary.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .fontWeight(.semibold)
+        .foregroundStyle(FloatingStyle.accent)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(FloatingStyle.accent.opacity(0.08))
+        .overlay { Capsule().stroke(FloatingStyle.accent.opacity(0.18), lineWidth: 0.7) }
+        .clipShape(Capsule())
         .frame(maxWidth: 110)
     }
 
     @ViewBuilder
     private func markdownContent(_ text: String) -> some View {
-        Text(LocalizedStringKey(text))
-            .font(.callout)
-            .textSelection(.enabled)
+        FloatingMarkdownView(text: text)
+    }
+}
+
+private struct FloatingMarkdownView: View {
+    let text: String
+
+    private enum Block: Identifiable {
+        case heading(Int, String)
+        case paragraph(String)
+        case bullet(String)
+        case numbered(String, String)
+        case quote(String)
+        case code(String, String?)
+        case divider
+
+        var id: UUID { UUID() }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
+                blockView(block)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .textSelection(.enabled)
+    }
+
+    @ViewBuilder
+    private func blockView(_ block: Block) -> some View {
+        switch block {
+        case .heading(let level, let content):
+            Text(inlineMarkdown(content))
+                .font(headingFont(level))
+                .foregroundStyle(level == 1 ? FloatingStyle.accent : .primary)
+                .padding(.top, level == 1 ? 3 : 1)
+        case .paragraph(let content):
+            Text(inlineMarkdown(content))
+                .font(.callout)
+                .lineSpacing(3)
+        case .bullet(let content):
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Circle()
+                    .fill(FloatingStyle.accent)
+                    .frame(width: 5, height: 5)
+                Text(inlineMarkdown(content))
+                    .font(.callout)
+            }
+        case .numbered(let number, let content):
+            HStack(alignment: .firstTextBaseline, spacing: 7) {
+                Text(number)
+                    .font(.caption.monospaced().weight(.bold))
+                    .foregroundStyle(FloatingStyle.accent)
+                    .frame(minWidth: 18, alignment: .trailing)
+                Text(inlineMarkdown(content))
+                    .font(.callout)
+            }
+        case .quote(let content):
+            Text(inlineMarkdown(content))
+                .font(.callout)
+                .foregroundStyle(Color.white.opacity(0.68))
+                .padding(.leading, 11)
+                .overlay(alignment: .leading) {
+                    Capsule().fill(FloatingStyle.accent).frame(width: 3)
+                }
+        case .code(let content, let language):
+            VStack(alignment: .leading, spacing: 7) {
+                if let language, !language.isEmpty {
+                    Text(language.uppercased())
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .foregroundStyle(FloatingStyle.accent)
+                }
+                ScrollView(.horizontal) {
+                    Text(content)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(Color.white.opacity(0.82))
+                        .fixedSize(horizontal: true, vertical: false)
+                }
+                .scrollIndicators(.hidden)
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.black.opacity(0.34), in: RoundedRectangle(cornerRadius: 9))
+            .overlay { RoundedRectangle(cornerRadius: 9).stroke(FloatingStyle.border) }
+        case .divider:
+            Divider().overlay(FloatingStyle.border)
+        }
+    }
+
+    private var blocks: [Block] {
+        var result: [Block] = []
+        var paragraph: [String] = []
+        var codeLines: [String] = []
+        var codeLanguage: String?
+        var isInCode = false
+
+        func flushParagraph() {
+            guard !paragraph.isEmpty else { return }
+            result.append(.paragraph(paragraph.joined(separator: "\n")))
+            paragraph.removeAll()
+        }
+
+        func flushCode() {
+            result.append(.code(codeLines.joined(separator: "\n"), codeLanguage))
+            codeLines.removeAll()
+            codeLanguage = nil
+        }
+
+        for line in text.components(separatedBy: .newlines) {
+            if line.hasPrefix("```") {
+                if isInCode { flushCode() } else {
+                    flushParagraph()
+                    let language = String(line.dropFirst(3)).trimmingCharacters(in: .whitespaces)
+                    codeLanguage = language.isEmpty ? nil : language
+                }
+                isInCode.toggle()
+                continue
+            }
+            if isInCode {
+                codeLines.append(line)
+                continue
+            }
+
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.isEmpty { flushParagraph(); continue }
+            if trimmed == "---" || trimmed == "***" || trimmed == "___" {
+                flushParagraph(); result.append(.divider); continue
+            }
+            if let heading = heading(from: trimmed) {
+                flushParagraph(); result.append(.heading(heading.0, heading.1)); continue
+            }
+            if trimmed.hasPrefix("- ") || trimmed.hasPrefix("* ") || trimmed.hasPrefix("+ ") {
+                flushParagraph(); result.append(.bullet(String(trimmed.dropFirst(2)))); continue
+            }
+            if let numbered = numberedItem(from: trimmed) {
+                flushParagraph(); result.append(.numbered(numbered.0, numbered.1)); continue
+            }
+            if trimmed.hasPrefix("> ") {
+                flushParagraph(); result.append(.quote(String(trimmed.dropFirst(2)))); continue
+            }
+            paragraph.append(line)
+        }
+        if isInCode || !codeLines.isEmpty { flushCode() }
+        flushParagraph()
+        return result
+    }
+
+    private func heading(from line: String) -> (Int, String)? {
+        let count = line.prefix(while: { $0 == "#" }).count
+        guard (1...6).contains(count), line.dropFirst(count).first == " " else { return nil }
+        return (count, String(line.dropFirst(count + 1)))
+    }
+
+    private func numberedItem(from line: String) -> (String, String)? {
+        guard let dot = line.firstIndex(of: "."), dot < line.endIndex else { return nil }
+        let number = String(line[..<dot])
+        guard !number.isEmpty, number.allSatisfy(\.isNumber) else { return nil }
+        let contentStart = line.index(after: dot)
+        guard contentStart < line.endIndex, line[contentStart] == " " else { return nil }
+        return (number + ".", String(line[line.index(after: contentStart)...]))
+    }
+
+    private func inlineMarkdown(_ value: String) -> AttributedString {
+        (try? AttributedString(
+            markdown: value,
+            options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+        )) ?? AttributedString(value)
+    }
+
+    private func headingFont(_ level: Int) -> Font {
+        switch level {
+        case 1: .title3.bold()
+        case 2: .headline.bold()
+        default: .callout.bold()
+        }
+    }
+}
+
+private struct FloatingPromptButton: View {
+    let index: Int
+    let prompt: CustomPrompt
+    let action: () -> Void
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Text("\(index)")
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundStyle(isHovering ? Color.black : FloatingStyle.accent)
+                    .frame(width: 20, height: 20)
+                    .background(
+                        isHovering ? FloatingStyle.accent : FloatingStyle.accent.opacity(0.09),
+                        in: Circle()
+                    )
+                Image(systemName: prompt.icon)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(isHovering ? FloatingStyle.accent : Color.white.opacity(0.58))
+                    .frame(width: 18)
+                Text(prompt.title)
+                    .font(.system(size: 13, weight: .semibold))
+                Spacer()
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(isHovering ? FloatingStyle.accent : Color.white.opacity(0.18))
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 38)
+            .background(isHovering ? FloatingStyle.panel : Color.clear, in: RoundedRectangle(cornerRadius: 10))
+            .contentShape(RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 4)
+        .onHover { hovering in
+            withAnimation(.easeOut(duration: 0.13)) { isHovering = hovering }
+        }
     }
 }
