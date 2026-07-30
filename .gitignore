@@ -8,6 +8,11 @@ DerivedData/
 *.xcscmblueprint
 *.xcodeproj/project.xcworkspace
 *.xcodeproj/xcuserdata
+!Flick.xcodeproj/project.xcworkspace/
+!Flick.xcodeproj/project.xcworkspace/xcshareddata/
+!Flick.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
+!Flick.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+Flick.xcodeproj/project.xcworkspace/contents.xcworkspacedata
 
 # Build products
 build/
@@ -20,6 +25,8 @@ build/
 .build/
 Packages/
 *.xcodeproj
+!Flick.xcodeproj/
+!Flick.xcodeproj/project.pbxproj
 
 # App Code Signing
 *.p12
@@ -43,8 +50,8 @@ Thumbs.db
 *.temp
 .*.swp
 
-# Logs
-*.log
+# Release packages
+*.dmg
 logs/
 
 # Personal settings
